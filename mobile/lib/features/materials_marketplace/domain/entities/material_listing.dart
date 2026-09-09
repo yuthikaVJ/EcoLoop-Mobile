@@ -27,7 +27,7 @@ class MaterialListing {
 }
 
 // Dummy data for development
-final List<MaterialListing> dummyListings = [
+List<MaterialListing> get dummyListings => [
   MaterialListing(
     id: '1',
     title: 'Clean LDPE Pellets',
@@ -77,6 +77,58 @@ final List<MaterialListing> dummyListings = [
     price: 90.0,
     priceUnit: 'Ton',
     isVerifiedSeller: true,
+    imageUrl: 'https://via.placeholder.com/150',
+    isIHave: false,
+  ),
+  MaterialListing(
+    id: '5',
+    title: 'Industrial Wood Pallets',
+    category: 'WOOD',
+    quantity: '200 Units',
+    location: 'Westside Logistics Park',
+    companyName: 'TimberRecycle',
+    price: 5.0,
+    priceUnit: 'Unit',
+    isVerifiedSeller: false,
+    imageUrl: 'https://via.placeholder.com/150',
+    isIHave: true,
+  ),
+  MaterialListing(
+    id: '6',
+    title: 'Recycled Aluminum Cans',
+    category: 'METALS',
+    quantity: '1.5 Tons',
+    location: 'City Center Hub',
+    companyName: 'AlumCo',
+    price: 1200.0,
+    priceUnit: 'Ton',
+    isVerifiedSeller: true,
+    imageUrl: 'https://via.placeholder.com/150',
+    isIHave: true,
+  ),
+  MaterialListing(
+    id: '7',
+    title: 'Scrap Copper Wire',
+    category: 'METALS',
+    quantity: '500 Kgs',
+    location: 'East Industrial Estate',
+    companyName: 'EcoWiring',
+    price: 3500.0,
+    priceUnit: 'Ton',
+    isVerifiedSeller: true,
+    imageUrl: 'https://via.placeholder.com/150',
+    isIHave: true,
+  ),
+  MaterialListing(
+    id: '8',
+    title: 'Mixed Paper Waste',
+    category: 'PAPER',
+    quantity: '20 Tons',
+    location: 'Southside Facility',
+    companyName: 'PaperCycle',
+    price: 80.0,
+    priceUnit: 'Ton',
+    isVerifiedSeller: false,
     imageUrl: 'https://via.placeholder.com/150',
     isIHave: false,
   )

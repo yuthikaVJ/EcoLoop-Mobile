@@ -3,9 +3,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EcoLoop.Api.Data;
 
-public class ProductDbContext  : DbContext
+public class EcoLoopDbContext  : DbContext
 {
-    public ProductDbContext(DbContextOptions<ProductDbContext> options)
+    public EcoLoopDbContext(DbContextOptions<EcoLoopDbContext> options)
         : base(options)
     {
     }

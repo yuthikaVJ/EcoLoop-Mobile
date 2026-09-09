@@ -3,9 +3,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EcoLoop.Api.Data;
 
-public class EcoLoopDbContext  : DbContext
+public class EcoLoopDbContext : DbContext
 {
-    public EcoLoopDbContext(DbContextOptions<EcoLoopDbContext> options)
+    public EcoLoopDbContext(
+        DbContextOptions<EcoLoopDbContext> options)
         : base(options)
     {
     }
@@ -16,26 +17,45 @@ public class EcoLoopDbContext  : DbContext
     public DbSet<Inventory> Inventories => Set<Inventory>();
     public DbSet<Business> Businesses => Set<Business>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void OnModelCreating(
+        ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Product>()
             .Property(product => product.Price)
             .HasPrecision(12, 2);
 
         modelBuilder.Entity<Product>()
+            .HasOne(product => product.Category)
+            .WithMany(category => category.Products)
+            .HasForeignKey(product => product.CategoryId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Product>()
+            .HasOne(product => product.Business)
+            .WithMany()
+            .HasForeignKey(product => product.BusinessId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Product>()
             .HasOne(product => product.Inventory)
             .WithOne(inventory => inventory.Product)
-            .HasForeignKey<Inventory>(inventory => inventory.ProductId);
+            .HasForeignKey<Inventory>(
+                inventory => inventory.ProductId);
 
         modelBuilder.Entity<Product>()
             .HasMany(product => product.Images)
             .WithOne(image => image.Product)
-            .HasForeignKey(image => image.ProductId);
+            .HasForeignKey(image => image.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<Product>()
             .HasIndex(product => product.Name);
 
         modelBuilder.Entity<Product>()
             .HasIndex(product => product.CategoryId);
+
+        modelBuilder.Entity<Inventory>()
+            .HasIndex(inventory => inventory.ProductId)
+            .IsUnique();
     }
 }

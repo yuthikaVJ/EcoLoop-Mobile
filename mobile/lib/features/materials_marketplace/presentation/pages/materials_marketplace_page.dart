@@ -3,6 +3,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/material_listing.dart';
 import '../widgets/featured_material_card.dart';
 import '../widgets/grid_material_card.dart';
+import 'add_material_page.dart';
 
 class MaterialsMarketplacePage extends StatefulWidget {
   const MaterialsMarketplacePage({super.key});
@@ -223,7 +224,31 @@ class _MaterialsMarketplacePageState extends State<MaterialsMarketplacePage> wit
         backgroundColor: AppColors.forestGreen,
         child: const Icon(Icons.add, color: AppColors.white),
         onPressed: () {
-          // TODO: Navigate to Add Material Form Screen
+          Navigator.of(context).push(
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) => const AddMaterialPage(),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                const begin = Offset(0.0, 1.0); // Slide up from bottom
+                const end = Offset.zero;
+                const curve = Curves.easeOutCubic;
+
+                var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                var offsetAnimation = animation.drive(tween);
+                var fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+                  CurvedAnimation(parent: animation, curve: Curves.easeIn),
+                );
+
+                return SlideTransition(
+                  position: offsetAnimation,
+                  child: FadeTransition(
+                    opacity: fadeAnimation,
+                    child: child,
+                  ),
+                );
+              },
+              transitionDuration: const Duration(milliseconds: 400),
+            ),
+          );
         },
       ),
     );

@@ -5,6 +5,7 @@ import '../widgets/featured_material_card.dart';
 import '../widgets/grid_material_card.dart';
 import 'add_material_page.dart';
 import 'material_details_page.dart';
+import 'my_listings_page.dart';
 
 class MaterialsMarketplacePage extends StatefulWidget {
   const MaterialsMarketplacePage({super.key});
@@ -71,6 +72,17 @@ class _MaterialsMarketplacePageState extends State<MaterialsMarketplacePage> wit
     return Scaffold(
       appBar: AppBar(
         title: const Text('Materials Marketplace', style: TextStyle(fontWeight: FontWeight.bold)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.list_alt, color: AppColors.forestGreen),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const MyListingsPage()),
+              );
+            },
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: AppColors.forestGreen,

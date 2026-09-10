@@ -10,6 +10,7 @@ class MaterialListing {
   final bool isVerifiedSeller;
   final String imageUrl;
   final bool isIHave; // true for 'I HAVE', false for 'I NEED'
+  final DateTime datePosted;
 
   MaterialListing({
     required this.id,
@@ -23,6 +24,7 @@ class MaterialListing {
     required this.isVerifiedSeller,
     required this.imageUrl,
     required this.isIHave,
+    required this.datePosted,
   });
 }
 
@@ -38,8 +40,9 @@ List<MaterialListing> get dummyListings => [
     price: 450.0,
     priceUnit: 'Ton',
     isVerifiedSeller: true,
-    imageUrl: 'https://via.placeholder.com/150', // Replace with real asset later
+    imageUrl: 'https://via.placeholder.com/150',
     isIHave: true,
+    datePosted: DateTime.now().subtract(const Duration(days: 2)),
   ),
   MaterialListing(
     id: '2',
@@ -53,6 +56,7 @@ List<MaterialListing> get dummyListings => [
     isVerifiedSeller: false,
     imageUrl: 'https://via.placeholder.com/150',
     isIHave: true,
+    datePosted: DateTime.now().subtract(const Duration(hours: 5)),
   ),
   MaterialListing(
     id: '3',
@@ -66,6 +70,7 @@ List<MaterialListing> get dummyListings => [
     isVerifiedSeller: true,
     imageUrl: 'https://via.placeholder.com/150',
     isIHave: true,
+    datePosted: DateTime.now().subtract(const Duration(days: 1)),
   ),
   MaterialListing(
     id: '4',
@@ -79,6 +84,7 @@ List<MaterialListing> get dummyListings => [
     isVerifiedSeller: true,
     imageUrl: 'https://via.placeholder.com/150',
     isIHave: false,
+    datePosted: DateTime.now().subtract(const Duration(minutes: 45)),
   ),
   MaterialListing(
     id: '5',
@@ -92,6 +98,7 @@ List<MaterialListing> get dummyListings => [
     isVerifiedSeller: false,
     imageUrl: 'https://via.placeholder.com/150',
     isIHave: true,
+    datePosted: DateTime.now().subtract(const Duration(days: 4)),
   ),
   MaterialListing(
     id: '6',
@@ -105,6 +112,7 @@ List<MaterialListing> get dummyListings => [
     isVerifiedSeller: true,
     imageUrl: 'https://via.placeholder.com/150',
     isIHave: true,
+    datePosted: DateTime.now().subtract(const Duration(days: 7)),
   ),
   MaterialListing(
     id: '7',
@@ -118,6 +126,7 @@ List<MaterialListing> get dummyListings => [
     isVerifiedSeller: true,
     imageUrl: 'https://via.placeholder.com/150',
     isIHave: true,
+    datePosted: DateTime.now().subtract(const Duration(hours: 12)),
   ),
   MaterialListing(
     id: '8',
@@ -131,6 +140,7 @@ List<MaterialListing> get dummyListings => [
     isVerifiedSeller: false,
     imageUrl: 'https://via.placeholder.com/150',
     isIHave: false,
+    datePosted: DateTime.now().subtract(const Duration(days: 3)),
   ),
   MaterialListing(
     id: '9',
@@ -144,6 +154,7 @@ List<MaterialListing> get dummyListings => [
     isVerifiedSeller: true,
     imageUrl: 'https://via.placeholder.com/150',
     isIHave: false,
+    datePosted: DateTime.now().subtract(const Duration(days: 1)),
   ),
   MaterialListing(
     id: '10',
@@ -157,6 +168,7 @@ List<MaterialListing> get dummyListings => [
     isVerifiedSeller: true,
     imageUrl: 'https://via.placeholder.com/150',
     isIHave: false,
+    datePosted: DateTime.now().subtract(const Duration(days: 5)),
   ),
   MaterialListing(
     id: '11',
@@ -170,6 +182,7 @@ List<MaterialListing> get dummyListings => [
     isVerifiedSeller: false,
     imageUrl: 'https://via.placeholder.com/150',
     isIHave: false,
+    datePosted: DateTime.now().subtract(const Duration(hours: 2)),
   ),
   MaterialListing(
     id: '12',
@@ -183,5 +196,6 @@ List<MaterialListing> get dummyListings => [
     isVerifiedSeller: true,
     imageUrl: 'https://via.placeholder.com/150',
     isIHave: false,
+    datePosted: DateTime.now().subtract(const Duration(days: 10)),
   )
 ];

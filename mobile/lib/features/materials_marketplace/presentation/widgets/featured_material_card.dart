@@ -35,13 +35,16 @@ class FeaturedMaterialCard extends StatelessWidget {
           children: [
             // Image
             Expanded(
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: AppColors.mintGreen,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                ),
-                child: const Center(
-                  child: Icon(Icons.inventory_2_outlined, size: 48, color: AppColors.ecoGreen),
+              child: Hero(
+                tag: 'hero_featured_${listing.id}',
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: AppColors.mintGreen,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.inventory_2_outlined, size: 48, color: AppColors.ecoGreen),
+                  ),
                 ),
               ),
             ),

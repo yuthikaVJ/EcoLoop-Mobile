@@ -4,6 +4,7 @@ import '../../domain/entities/material_listing.dart';
 import '../widgets/featured_material_card.dart';
 import '../widgets/grid_material_card.dart';
 import 'add_material_page.dart';
+import 'material_details_page.dart';
 
 class MaterialsMarketplacePage extends StatefulWidget {
   const MaterialsMarketplacePage({super.key});
@@ -155,7 +156,17 @@ class _MaterialsMarketplacePageState extends State<MaterialsMarketplacePage> wit
                                         },
                                         child: FeaturedMaterialCard(
                                           listing: featuredListings[index],
-                                          onTap: () {},
+                                          onTap: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) => MaterialDetailsPage(
+                                                  listing: featuredListings[index],
+                                                  heroTag: 'hero_featured_${featuredListings[index].id}',
+                                                ),
+                                              ),
+                                            );
+                                          },
                                         ),
                                       );
                                     },
@@ -203,7 +214,17 @@ class _MaterialsMarketplacePageState extends State<MaterialsMarketplacePage> wit
                                     },
                                     child: GridMaterialCard(
                                       listing: gridListings[index],
-                                      onTap: () {},
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => MaterialDetailsPage(
+                                              listing: gridListings[index],
+                                              heroTag: 'hero_grid_${gridListings[index].id}',
+                                            ),
+                                          ),
+                                        );
+                                      },
                                     ),
                                   );
                                 },

@@ -35,13 +35,16 @@ class GridMaterialCard extends StatelessWidget {
             // Image Placeholder
             Expanded(
               flex: 3,
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: AppColors.mintGreen,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-                ),
-                child: const Center(
-                  child: Icon(Icons.image_outlined, color: AppColors.ecoGreen),
+              child: Hero(
+                tag: 'hero_grid_${listing.id}',
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: AppColors.mintGreen,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.image_outlined, color: AppColors.ecoGreen),
+                  ),
                 ),
               ),
             ),

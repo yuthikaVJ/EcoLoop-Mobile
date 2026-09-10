@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-// Placeholder screens
-import '../../features/materials_marketplace/presentation/pages/materials_marketplace_page.dart';
+import '../../features/sustainable_products/sustainable_product_marketplace_page.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -16,7 +15,7 @@ class _AppShellState extends State<AppShell> {
   final List<Widget> _pages = [
     const Center(child: Text('Home Dashboard (Coming Soon)')),
     const MaterialsMarketplacePage(),
-    const Center(child: Text('Products (Coming Soon)')),
+          const MaterialsMarketplacePage(),
     const Center(child: Text('Notifications (Coming Soon)')),
     const Center(child: Text('Profile (Coming Soon)')),
   ];

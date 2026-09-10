@@ -9,7 +9,7 @@ class ApiClient {
   ApiClient({
     String? baseUrl,
     http.Client? client,
-  })  : baseUrl = baseUrl ?? 'http://10.0.2.2:5000',
+  })  : baseUrl = baseUrl ?? 'http://10.0.2.2:5252',
         _client = client ?? http.Client();
 
   Future<dynamic> get(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/material_listing.dart';
+import 'chat_page.dart';
 
 class MaterialDetailsPage extends StatelessWidget {
   final MaterialListing listing;
@@ -197,7 +198,10 @@ class MaterialDetailsPage extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 16),
           ),
           onPressed: () {
-            // Action
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => ChatPage(listing: listing)),
+            );
           },
           child: const Text('Contact Seller', style: TextStyle(fontSize: 16, color: AppColors.white, fontWeight: FontWeight.bold)),
         ),

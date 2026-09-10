@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-// Placeholder screens
+import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/materials_marketplace/presentation/pages/materials_marketplace_page.dart';
 
 class AppShell extends StatefulWidget {
@@ -11,10 +11,10 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  int _currentIndex = 1; // Default to Materials tab for development
+  int _currentIndex = 0; // Default to Home Dashboard
 
   final List<Widget> _pages = [
-    const Center(child: Text('Home Dashboard (Coming Soon)')),
+    const HomePage(),
     const MaterialsMarketplacePage(),
     const Center(child: Text('Products (Coming Soon)')),
     const Center(child: Text('Notifications (Coming Soon)')),

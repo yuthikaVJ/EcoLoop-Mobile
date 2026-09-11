@@ -16,6 +16,7 @@ public class EcoLoopDbContext : DbContext
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
     public DbSet<Inventory> Inventories => Set<Inventory>();
     public DbSet<Business> Businesses => Set<Business>();
+    public DbSet<MaterialListing> MaterialListings => Set<MaterialListing>();
 
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)
@@ -57,5 +58,28 @@ public class EcoLoopDbContext : DbContext
         modelBuilder.Entity<Inventory>()
             .HasIndex(inventory => inventory.ProductId)
             .IsUnique();
+
+        // ── MaterialListing configuration ──
+        modelBuilder.Entity<MaterialListing>()
+            .Property(listing => listing.Price)
+            .HasPrecision(12, 2);
+
+        modelBuilder.Entity<MaterialListing>()
+            .HasOne(listing => listing.Business)
+            .WithMany()
+            .HasForeignKey(listing => listing.BusinessId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<MaterialListing>()
+            .HasIndex(listing => listing.Category);
+
+        modelBuilder.Entity<MaterialListing>()
+            .HasIndex(listing => listing.Type);
+
+        modelBuilder.Entity<MaterialListing>()
+            .HasIndex(listing => listing.Status);
+
+        modelBuilder.Entity<MaterialListing>()
+            .HasIndex(listing => listing.BusinessId);
     }
 }

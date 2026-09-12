@@ -14,6 +14,7 @@ public class CreateMaterialListingRequest
     public string PriceUnit { get; set; } = string.Empty;
     public string DeliveryMethod { get; set; } = string.Empty;
     public int Type { get; set; } // 0 = IHave, 1 = INeed
+    public string? ImageUrl { get; set; }
 }
 
 // Request to update an existing listing
@@ -28,6 +29,7 @@ public class UpdateMaterialListingRequest
     public decimal Price { get; set; }
     public string PriceUnit { get; set; } = string.Empty;
     public string DeliveryMethod { get; set; } = string.Empty;
+    public string? ImageUrl { get; set; }
 }
 
 // Compact DTO for list/grid views
@@ -45,6 +47,7 @@ public class MaterialListingListDto
     public int Type { get; set; }
     public int Status { get; set; }
     public DateTime CreatedAt { get; set; }
+    public string? ImageUrl { get; set; }
 }
 
 // Full DTO for details page
@@ -66,4 +69,5 @@ public class MaterialListingDetailsDto
     public int Type { get; set; }
     public int Status { get; set; }
     public DateTime CreatedAt { get; set; }
+    public string? ImageUrl { get; set; }
 }

@@ -124,3 +124,4 @@ C:\Users\User\Desktop\ECOLOOP\backend\obj\Debug\net10.0\refint\backend.dll
 C:\Users\User\Desktop\ECOLOOP\backend\obj\Debug\net10.0\backend.pdb
 C:\Users\User\Desktop\ECOLOOP\backend\obj\Debug\net10.0\backend.genruntimeconfig.cache
 C:\Users\User\Desktop\ECOLOOP\backend\obj\Debug\net10.0\ref\backend.dll
+C:\Users\User\Desktop\ECOLOOP\backend\bin\Debug\net10.0\backend.staticwebassets.runtime.json

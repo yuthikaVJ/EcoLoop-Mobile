@@ -39,8 +39,25 @@ public class MaterialListingsController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateMaterialListingRequest request)
+    public async Task<IActionResult> Create([FromForm] CreateMaterialListingRequest request, IFormFile? image)
     {
+        if (image != null && image.Length > 0)
+        {
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "material_listings");
+            if (!Directory.Exists(uploadsFolder))
+                Directory.CreateDirectory(uploadsFolder);
+
+            var uniqueFileName = Guid.NewGuid().ToString() + "_" + image.FileName;
+            var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+            using (var fileStream = new FileStream(filePath, FileMode.Create))
+            {
+                await image.CopyToAsync(fileStream);
+            }
+
+            request.ImageUrl = $"http://10.0.2.2:5252/uploads/material_listings/{uniqueFileName}";
+        }
+
         var listing = await _listingService.CreateAsync(request);
         return CreatedAtAction(nameof(GetById), new { id = listing.Id }, listing);
     }

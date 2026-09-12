@@ -67,7 +67,8 @@ public class MaterialListingService : IMaterialListingService
                 SellerIsVerified = listing.Business != null && listing.Business.IsVerified,
                 Type = (int)listing.Type,
                 Status = (int)listing.Status,
-                CreatedAt = listing.CreatedAt
+                CreatedAt = listing.CreatedAt,
+                ImageUrl = listing.ImageUrl
             })
             .ToListAsync();
 
@@ -104,7 +105,8 @@ public class MaterialListingService : IMaterialListingService
                 SellerIsVerified = listing.Business != null && listing.Business.IsVerified,
                 Type = (int)listing.Type,
                 Status = (int)listing.Status,
-                CreatedAt = listing.CreatedAt
+                CreatedAt = listing.CreatedAt,
+                ImageUrl = listing.ImageUrl
             })
             .FirstOrDefaultAsync();
     }
@@ -125,7 +127,8 @@ public class MaterialListingService : IMaterialListingService
             DeliveryMethod = request.DeliveryMethod,
             Type = (EcoLoop.Api.Models.ListingType)request.Type,
             Status = EcoLoop.Api.Models.ListingStatus.Active,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            ImageUrl = request.ImageUrl
         };
 
         _db.MaterialListings.Add(listing);

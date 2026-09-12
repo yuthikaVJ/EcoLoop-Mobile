@@ -20,6 +20,8 @@ public class MaterialListing
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
+    
+    public string? ImageUrl { get; set; }
 
     // Navigation
     public Business? Business { get; set; }

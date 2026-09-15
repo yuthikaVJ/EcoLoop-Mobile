@@ -6,41 +6,82 @@ import '../../domain/entities/business_profile.dart';
 import 'business_profile_details_page.dart';
 import 'create_business_profile_page.dart';
 
+const String defaultCurrentUserId = '11111111-1111-1111-1111-111111111111';
+
 class BusinessHubLandingPage extends StatefulWidget {
-  const BusinessHubLandingPage({super.key});
+  final String? currentUserId;
+
+  const BusinessHubLandingPage({
+    super.key,
+    this.currentUserId = defaultCurrentUserId,
+  });
 
   @override
   State<BusinessHubLandingPage> createState() => _BusinessHubLandingPageState();
 }
 
-class _BusinessHubLandingPageState extends State<BusinessHubLandingPage> {
+class _BusinessHubLandingPageState extends State<BusinessHubLandingPage>
+    with SingleTickerProviderStateMixin {
   final BusinessRepository _repository = BusinessRepository();
-  late Future<List<BusinessProfile>> _profilesFuture;
+
+  late TabController _tabController;
+  late Future<void> _dataFuture;
+
+  BusinessProfile? _myProfile;
+  List<BusinessProfile> _allProfiles = [];
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _loadProfiles();
+    _tabController = TabController(length: 2, vsync: this);
+    _loadData();
   }
 
-  void _loadProfiles() {
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _loadData() {
     setState(() {
-      _profilesFuture = _repository.getAllBusinessProfiles();
+      _dataFuture = _fetchData();
     });
   }
 
+  Future<void> _fetchData() async {
+    _errorMessage = null;
+    try {
+      final userId = widget.currentUserId ?? defaultCurrentUserId;
+      final results = await Future.wait([
+        _repository.getMyBusinessProfile(userId),
+        _repository.getAllBusinessProfiles(),
+      ]);
+
+      _myProfile = results[0] as BusinessProfile?;
+      _allProfiles = results[1] as List<BusinessProfile>;
+    } catch (e) {
+      _errorMessage = e.toString();
+      rethrow;
+    }
+  }
+
   Future<void> _refresh() async {
-    _loadProfiles();
-    await _profilesFuture;
+    _loadData();
+    await _dataFuture;
   }
 
   void _openCreatePage() async {
+    final userId = widget.currentUserId ?? defaultCurrentUserId;
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => const CreateBusinessProfilePage(),
+        builder: (context) => CreateBusinessProfilePage(
+          currentUserId: userId,
+        ),
       ),
     );
-    _loadProfiles();
+    _refresh();
   }
 
   String _formatErrorMessage(Object? error) {
@@ -52,7 +93,6 @@ class _BusinessHubLandingPageState extends State<BusinessHubLandingPage> {
     return errorStr;
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -60,6 +100,23 @@ class _BusinessHubLandingPageState extends State<BusinessHubLandingPage> {
         title: const Text(
           'Business Hub',
           style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: AppColors.forestGreen,
+          unselectedLabelColor: AppColors.slateGray,
+          indicatorColor: AppColors.forestGreen,
+          indicatorWeight: 3,
+          tabs: [
+            Tab(
+              icon: const Icon(Icons.person_pin, size: 20),
+              text: _myProfile != null ? 'My Profile' : 'Get Started',
+            ),
+            Tab(
+              icon: const Icon(Icons.storefront_outlined, size: 20),
+              text: 'Directory (${_allProfiles.length})',
+            ),
+          ],
         ),
         actions: [
           IconButton(
@@ -69,190 +126,252 @@ class _BusinessHubLandingPageState extends State<BusinessHubLandingPage> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: FutureBuilder<List<BusinessProfile>>(
-          future: _profilesFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
+      body: FutureBuilder<void>(
+        future: _dataFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-            if (snapshot.hasError) {
-              return Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.cloud_off_outlined,
-                        size: 56,
-                        color: AppColors.slateGray,
+          if (snapshot.hasError) {
+            return Center(
+              child: SingleChildScrollView(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.cloud_off_outlined,
+                      size: 56,
+                      color: AppColors.slateGray,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Unable to connect to EcoLoop API',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _formatErrorMessage(snapshot.error),
+                      textAlign: TextAlign.center,
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton.icon(
+                      onPressed: _refresh,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Try Again'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          return TabBarView(
+            controller: _tabController,
+            children: [
+              // Tab 1: My Business Profile (or Onboarding CTA if no profile)
+              RefreshIndicator(
+                onRefresh: _refresh,
+                child: _myProfile != null
+                    ? BusinessProfileDetailsPage(
+                        profile: _myProfile!,
+                        currentUserId: widget.currentUserId,
+                      )
+                    : _buildOnboardingState(),
+              ),
+
+              // Tab 2: Directory of all registered businesses
+              RefreshIndicator(
+                onRefresh: _refresh,
+                child: _buildProfilesDirectory(),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildOnboardingState() {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const SizedBox(height: 12),
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.slateGray.withOpacity(0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+                border: Border.all(color: AppColors.mintGreen, width: 1.5),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: AppColors.mintGreen,
+                      borderRadius: BorderRadius.circular(36),
+                    ),
+                    child: const Icon(
+                      Icons.business_center,
+                      size: 36,
+                      color: AppColors.forestGreen,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Join EcoLoop Business Hub',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.darkCharcoal,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Register your business profile to start buying and selling recyclable materials, listing sustainable products, and requesting official eROC verification.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.slateGray,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  _buildFeatureBenefit(
+                    icon: Icons.recycling,
+                    title: 'Circular Marketplace Access',
+                    subtitle: 'Post I HAVE materials and I NEED requests',
+                  ),
+                  const SizedBox(height: 14),
+                  _buildFeatureBenefit(
+                    icon: Icons.store_mall_directory,
+                    title: 'Sustainable Product Store',
+                    subtitle:
+                        'Sell eco-friendly finished goods directly to consumers',
+                  ),
+                  const SizedBox(height: 14),
+                  _buildFeatureBenefit(
+                    icon: Icons.verified,
+                    title: 'eROC Business Verification',
+                    subtitle:
+                        'Get certified by Super Admins and earn the verified badge',
+                  ),
+                  const SizedBox(height: 28),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton.icon(
+                      onPressed: _openCreatePage,
+                      icon: const Icon(Icons.add_business),
+                      label: const Text(
+                        'Create Business Profile',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Unable to connect to EcoLoop API',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _formatErrorMessage(snapshot.error),
-                        textAlign: TextAlign.center,
-                        maxLines: 4,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      const SizedBox(height: 20),
-                      ElevatedButton.icon(
-                        onPressed: _refresh,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Try Again'),
-                      ),
-                    ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProfilesDirectory() {
+    if (_allProfiles.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.store_outlined, size: 56, color: AppColors.slateGray),
+              const SizedBox(height: 16),
+              const Text(
+                'No registered businesses yet',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.darkCharcoal,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Be the first business to join the EcoLoop circular economy ecosystem.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.slateGray),
+              ),
+              const SizedBox(height: 20),
+              if (_myProfile == null)
+                ElevatedButton.icon(
+                  onPressed: _openCreatePage,
+                  icon: const Icon(Icons.add_business),
+                  label: const Text('Create Business Profile'),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 860),
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Registered Businesses (${_allProfiles.length})',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.darkCharcoal,
                   ),
                 ),
-              );
-            }
-
-
-            final profiles = snapshot.data ?? [];
-
-            if (profiles.isEmpty) {
-              return _buildEmptyState();
-            }
-
-            return _buildProfilesView(profiles);
-          },
+                if (_myProfile == null)
+                  TextButton.icon(
+                    onPressed: _openCreatePage,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Join Hub'),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ..._allProfiles.map((profile) => _buildProfileCard(profile)),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        const SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.slateGray.withOpacity(0.08),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
-            border: Border.all(color: AppColors.mintGreen, width: 1.5),
-          ),
-          child: Column(
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: AppColors.mintGreen,
-                  borderRadius: BorderRadius.circular(36),
-                ),
-                child: const Icon(
-                  Icons.business_center,
-                  size: 36,
-                  color: AppColors.forestGreen,
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Join EcoLoop Business Hub',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.darkCharcoal,
-                ),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'Register your business profile to start buying and selling recyclable materials, listing sustainable products, and requesting official eROC verification.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.slateGray,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 24),
-              _buildFeatureBenefit(
-                icon: Icons.recycling,
-                title: 'Circular Marketplace Access',
-                subtitle: 'Post I HAVE materials and I NEED requests',
-              ),
-              const SizedBox(height: 14),
-              _buildFeatureBenefit(
-                icon: Icons.store_mall_directory,
-                title: 'Sustainable Product Store',
-                subtitle: 'Sell eco-friendly finished goods directly to consumers',
-              ),
-              const SizedBox(height: 14),
-              _buildFeatureBenefit(
-                icon: Icons.verified,
-                title: 'eROC Business Verification',
-                subtitle: 'Get certified by Super Admins and earn the verified badge',
-              ),
-              const SizedBox(height: 28),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton.icon(
-                  onPressed: _openCreatePage,
-                  icon: const Icon(Icons.add_business),
-                  label: const Text(
-                    'Create Business Profile',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProfilesView(List<BusinessProfile> profiles) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Registered Businesses (${profiles.length})',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.darkCharcoal,
-              ),
-            ),
-            TextButton.icon(
-              onPressed: _openCreatePage,
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Add Another'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        ...profiles.map((profile) => _buildProfileCard(profile)),
-      ],
-    );
-  }
-
   Widget _buildProfileCard(BusinessProfile profile) {
+    final logoUrl = _repository.apiClient.resolveUrl(profile.logoUrl);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 14),
       shape: RoundedRectangleBorder(
@@ -263,7 +382,10 @@ class _BusinessHubLandingPageState extends State<BusinessHubLandingPage> {
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => BusinessProfileDetailsPage(profile: profile),
+              builder: (context) => BusinessProfileDetailsPage(
+                profile: profile,
+                currentUserId: widget.currentUserId,
+              ),
             ),
           );
         },
@@ -278,11 +400,9 @@ class _BusinessHubLandingPageState extends State<BusinessHubLandingPage> {
                   CircleAvatar(
                     radius: 26,
                     backgroundColor: AppColors.mintGreen,
-                    backgroundImage: profile.logoUrl != null &&
-                            profile.logoUrl!.isNotEmpty
-                        ? NetworkImage(profile.logoUrl!)
-                        : null,
-                    child: profile.logoUrl == null || profile.logoUrl!.isEmpty
+                    backgroundImage:
+                        logoUrl != null ? NetworkImage(logoUrl) : null,
+                    child: logoUrl == null
                         ? Text(
                             profile.businessName.isNotEmpty
                                 ? profile.businessName[0].toUpperCase()
@@ -300,13 +420,27 @@ class _BusinessHubLandingPageState extends State<BusinessHubLandingPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          profile.businessName,
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.darkCharcoal,
-                          ),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                profile.businessName,
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.darkCharcoal,
+                                ),
+                              ),
+                            ),
+                            if (profile.isVerified) ...[
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.verified,
+                                color: Color(0xFF1877F2),
+                                size: 16,
+                              ),
+                            ],
+                          ],
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -316,6 +450,19 @@ class _BusinessHubLandingPageState extends State<BusinessHubLandingPage> {
                             color: AppColors.slateGray,
                           ),
                         ),
+                        if (profile.bio != null && profile.bio!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            profile.bio!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                              color: AppColors.slateGray,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -386,18 +533,18 @@ class _BusinessHubLandingPageState extends State<BusinessHubLandingPage> {
                 ],
               ),
               const SizedBox(height: 10),
-              Row(
+              const Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   Text(
-                    'View Details',
+                    'View Profile',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: AppColors.forestGreen,
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  SizedBox(width: 4),
                   Icon(
                     Icons.arrow_forward_ios,
                     size: 12,

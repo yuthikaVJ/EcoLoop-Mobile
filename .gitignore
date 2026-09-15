@@ -8,6 +8,7 @@
 
 # .NET local configuration / secrets
 backend/appsettings.Development.json
+backend/wwwroot/uploads/
 
 # Flutter generated files
 mobile/.dart_tool/

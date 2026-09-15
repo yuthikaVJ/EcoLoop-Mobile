@@ -1,2 +1,30 @@
-figma/
-EcoLoop_Corrected_Project_Document.pdf/
+# Visual Studio / IDE
+.vs/
+.idea/
+
+# .NET build files
+**/bin/
+**/obj/
+
+# .NET local configuration / secrets
+backend/appsettings.Development.json
+
+# Flutter generated files
+mobile/.dart_tool/
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.packages
+
+# Android generated files
+mobile/android/.gradle/
+mobile/android/local.properties/
+
+# React / Node
+admin_web/node_modules/
+admin_web/dist/
+
+# Environment files
+.env
+.env.*
+!.env.example

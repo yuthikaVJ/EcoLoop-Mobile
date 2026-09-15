@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../features/business_hub/presentation/pages/business_hub_landing_page.dart';
 import '../../features/sustainable_products/sustainable_product_marketplace_page.dart';
 
 class AppShell extends StatefulWidget {
@@ -15,10 +16,11 @@ class _AppShellState extends State<AppShell> {
   final List<Widget> _pages = [
     const Center(child: Text('Home Dashboard (Coming Soon)')),
     const MaterialsMarketplacePage(),
-          const MaterialsMarketplacePage(),
+    const MaterialsMarketplacePage(),
     const Center(child: Text('Notifications (Coming Soon)')),
-    const Center(child: Text('Profile (Coming Soon)')),
+    const BusinessHubLandingPage(),
   ];
+
 
   @override
   Widget build(BuildContext context) {

@@ -57,5 +57,11 @@ public class EcoLoopDbContext : DbContext
         modelBuilder.Entity<Inventory>()
             .HasIndex(inventory => inventory.ProductId)
             .IsUnique();
+
+        modelBuilder.Entity<Business>()
+            .HasIndex(b => b.RegistrationNumber);
+
+        modelBuilder.Entity<Business>()
+            .HasIndex(b => b.UserId);
     }
-}
+}

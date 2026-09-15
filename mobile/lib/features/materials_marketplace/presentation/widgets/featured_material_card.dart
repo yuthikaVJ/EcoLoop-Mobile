@@ -42,8 +42,15 @@ class FeaturedMaterialCard extends StatelessWidget {
                     color: AppColors.mintGreen,
                     borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                   ),
-                  child: const Center(
-                    child: Icon(Icons.inventory_2_outlined, size: 48, color: AppColors.ecoGreen),
+                  clipBehavior: Clip.hardEdge,
+                  child: Image.network(
+                    listing.imageUrl,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Center(child: Icon(Icons.inventory_2_outlined, size: 48, color: AppColors.ecoGreen));
+                    },
                   ),
                 ),
               ),

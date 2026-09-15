@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/materials_marketplace/presentation/pages/materials_marketplace_page.dart';
+import '../../features/materials_marketplace/presentation/pages/chat_page.dart';
+import '../../features/profile/presentation/pages/profile_page.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -17,8 +19,8 @@ class _AppShellState extends State<AppShell> {
     const HomePage(),
     const MaterialsMarketplacePage(),
     const Center(child: Text('Products (Coming Soon)')),
-    const Center(child: Text('Notifications (Coming Soon)')),
-    const Center(child: Text('Profile (Coming Soon)')),
+    const Scaffold(body: Center(child: Text('My Listings - Coming Soon'))),
+    const ProfilePage(),
   ];
 
   @override

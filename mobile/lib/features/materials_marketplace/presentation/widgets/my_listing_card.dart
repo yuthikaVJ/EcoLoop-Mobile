@@ -49,8 +49,15 @@ class MyListingCard extends StatelessWidget {
                     color: AppColors.mintGreen,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Center(
-                    child: Icon(Icons.image_outlined, color: AppColors.ecoGreen),
+                  clipBehavior: Clip.hardEdge,
+                  child: Image.network(
+                    listing.imageUrl,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Center(child: Icon(Icons.inventory_2_outlined, color: AppColors.ecoGreen));
+                    },
                   ),
                 ),
                 const SizedBox(width: 12),

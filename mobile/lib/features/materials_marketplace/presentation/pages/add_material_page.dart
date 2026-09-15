@@ -1,20 +1,30 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../providers/material_listings_provider.dart';
 
-class AddMaterialPage extends StatefulWidget {
-  const AddMaterialPage({super.key});
+class AddMaterialPage extends ConsumerStatefulWidget {
+  final bool initialIsIHave;
+  const AddMaterialPage({super.key, this.initialIsIHave = true});
 
   @override
-  State<AddMaterialPage> createState() => _AddMaterialPageState();
+  ConsumerState<AddMaterialPage> createState() => _AddMaterialPageState();
 }
 
-class _AddMaterialPageState extends State<AddMaterialPage> {
+class _AddMaterialPageState extends ConsumerState<AddMaterialPage> {
   final _formKey = GlobalKey<FormState>();
   
+  // Controllers for text fields
+  final _titleController = TextEditingController();
+  final _descController = TextEditingController();
+  final _quantityController = TextEditingController();
+  final _priceController = TextEditingController();
+  final _locationController = TextEditingController();
+  
   // State variables for form fields
-  bool _isIHave = true;
+  late bool _isIHave;
   String? _selectedCategory;
   String _selectedUnit = 'Tons';
   String _deliveryOption = 'Self Pickup';
@@ -34,6 +44,22 @@ class _AddMaterialPageState extends State<AddMaterialPage> {
         _images.addAll(selectedImages);
       });
     }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _isIHave = widget.initialIsIHave;
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descController.dispose();
+    _quantityController.dispose();
+    _priceController.dispose();
+    _locationController.dispose();
+    super.dispose();
   }
 
   Widget _buildSectionTitle(String title) {
@@ -195,6 +221,7 @@ class _AddMaterialPageState extends State<AddMaterialPage> {
                       // Material Name
                       _buildSectionTitle('Material Name'),
                       TextFormField(
+                        controller: _titleController,
                         decoration: const InputDecoration(
                           hintText: 'e.g., Mixed High-Density Polyethylene',
                         ),
@@ -216,6 +243,7 @@ class _AddMaterialPageState extends State<AddMaterialPage> {
                       // Description
                       _buildSectionTitle('Description'),
                       TextFormField(
+                        controller: _descController,
                         maxLines: 4,
                         decoration: const InputDecoration(
                           hintText: 'Describe the condition, source, etc...',
@@ -232,6 +260,7 @@ class _AddMaterialPageState extends State<AddMaterialPage> {
                               children: [
                                 _buildSectionTitle('Quantity'),
                                 TextFormField(
+                                  controller: _quantityController,
                                   keyboardType: TextInputType.number,
                                   decoration: const InputDecoration(hintText: 'e.g. 15.5'),
                                   validator: (value) => value == null || value.isEmpty ? 'Required' : null,
@@ -260,19 +289,23 @@ class _AddMaterialPageState extends State<AddMaterialPage> {
                       ),
 
                       // Price
-                      _buildSectionTitle('Price (per $_selectedUnit)'),
-                      TextFormField(
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          hintText: '0.00',
-                          prefixText: '\$ ',
+                      if (_isIHave) ...[
+                        _buildSectionTitle('Price (per $_selectedUnit)'),
+                        TextFormField(
+                          controller: _priceController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            hintText: '0.00',
+                            prefixText: '\$ ',
+                          ),
+                          validator: (value) => value == null || value.isEmpty ? 'Required' : null,
                         ),
-                        validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                      ),
+                      ],
 
                       // Location
                       _buildSectionTitle('Location'),
                       TextFormField(
+                        controller: _locationController,
                         decoration: const InputDecoration(
                           hintText: 'Pickup address',
                           prefixIcon: Icon(Icons.location_on_outlined, color: AppColors.slateGray),
@@ -327,13 +360,40 @@ class _AddMaterialPageState extends State<AddMaterialPage> {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     if (_formKey.currentState!.validate()) {
-                      // Add material logic here
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Listing posted successfully!')),
-                      );
-                      Navigator.pop(context);
+                      try {
+                        final requestData = {
+                          "title": _titleController.text,
+                          "category": _selectedCategory ?? 'Other',
+                          "description": _descController.text,
+                          "quantity": _quantityController.text,
+                          "unit": _selectedUnit,
+                          "location": _locationController.text,
+                          "price": _isIHave ? (double.tryParse(_priceController.text) ?? 0.0) : 0.0,
+                          "priceUnit": _selectedUnit,
+                          "deliveryMethod": _deliveryOption,
+                          "type": _isIHave ? 0 : 1, // 0 = I Have, 1 = I Need
+                        };
+
+                        await ref.read(activeListingsNotifierProvider.notifier).addListing(
+                          requestData,
+                          imageFile: _images.isNotEmpty ? File(_images.first.path) : null,
+                        );
+                        
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Listing posted successfully!')),
+                          );
+                          Navigator.pop(context);
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to post: $e')),
+                          );
+                        }
+                      }
                     }
                   },
                   child: const Text('Post Listing', style: TextStyle(fontSize: 16)),

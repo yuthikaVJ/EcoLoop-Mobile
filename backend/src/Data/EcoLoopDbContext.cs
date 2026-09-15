@@ -17,6 +17,7 @@ public class EcoLoopDbContext : DbContext
     public DbSet<Inventory> Inventories => Set<Inventory>();
     public DbSet<Business> Businesses => Set<Business>();
     public DbSet<MaterialListing> MaterialListings => Set<MaterialListing>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)

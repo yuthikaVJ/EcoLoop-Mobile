@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/material_listing.dart';
+import '../providers/material_listings_provider.dart';
 import '../widgets/featured_material_card.dart';
 import '../widgets/grid_material_card.dart';
 import 'add_material_page.dart';
 import 'material_details_page.dart';
 import 'my_listings_page.dart';
 
-class MaterialsMarketplacePage extends StatefulWidget {
+class MaterialsMarketplacePage extends ConsumerStatefulWidget {
   const MaterialsMarketplacePage({super.key});
 
   @override
-  State<MaterialsMarketplacePage> createState() => _MaterialsMarketplacePageState();
+  ConsumerState<MaterialsMarketplacePage> createState() => _MaterialsMarketplacePageState();
 }
 
-class _MaterialsMarketplacePageState extends State<MaterialsMarketplacePage> with SingleTickerProviderStateMixin {
+class _MaterialsMarketplacePageState extends ConsumerState<MaterialsMarketplacePage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -41,10 +43,10 @@ class _MaterialsMarketplacePageState extends State<MaterialsMarketplacePage> wit
     super.dispose();
   }
 
-  List<MaterialListing> _getFilteredListings() {
+  List<MaterialListing> _getFilteredListings(List<MaterialListing> allListings) {
     final bool isIHaveTab = _tabController.index == 0;
     
-    return dummyListings.where((listing) {
+    return allListings.where((listing) {
       // 1. Filter by active tab
       if (listing.isIHave != isIHaveTab) return false;
       
@@ -61,13 +63,7 @@ class _MaterialsMarketplacePageState extends State<MaterialsMarketplacePage> wit
 
   @override
   Widget build(BuildContext context) {
-    final listings = _getFilteredListings();
-    
-    // For demo purposes, we treat the first few as "featured" if there's no search query.
-    // If searching, we just show everything in the grid.
-    final bool isSearching = _searchQuery.isNotEmpty;
-    final featuredListings = isSearching ? <MaterialListing>[] : listings.take(3).toList();
-    final gridListings = isSearching ? listings : listings.skip(3).toList();
+    final listingsAsyncValue = ref.watch(activeListingsNotifierProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -126,55 +122,124 @@ class _MaterialsMarketplacePageState extends State<MaterialsMarketplacePage> wit
           
           // Layout Area
           Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: listings.isEmpty
-                  ? const Center(
-                      key: ValueKey('empty'),
-                      child: Text('No materials found.'),
-                    )
-                  : CustomScrollView(
-                      key: ValueKey('list_${_tabController.index}_${isSearching ? "search" : "default"}'),
-                      slivers: [
-                        // Featured Carousel
-                        if (featuredListings.isNotEmpty)
-                          SliverToBoxAdapter(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                                  child: Text('Featured Listings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            child: listingsAsyncValue.when(
+              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.forestGreen)),
+              error: (err, stack) => Center(
+                child: Text('Error loading materials: $err', style: const TextStyle(color: Colors.red)),
+              ),
+              data: (allListings) {
+                final listings = _getFilteredListings(allListings);
+                final bool isSearching = _searchQuery.isNotEmpty;
+                final featuredListings = isSearching ? <MaterialListing>[] : listings.take(3).toList();
+                final gridListings = isSearching ? listings : listings.skip(3).toList();
+
+                return AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: listings.isEmpty
+                      ? const Center(
+                          key: ValueKey('empty'),
+                          child: Text('No materials found.'),
+                        )
+                      : CustomScrollView(
+                          key: ValueKey('list_${_tabController.index}_${isSearching ? "search" : "default"}'),
+                          slivers: [
+                            // Featured Carousel
+                            if (featuredListings.isNotEmpty)
+                              SliverToBoxAdapter(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Padding(
+                                      padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                                      child: Text('Featured Listings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                                    ),
+                                    SizedBox(
+                                      height: 220,
+                                      child: ListView.builder(
+                                        scrollDirection: Axis.horizontal,
+                                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                                        itemCount: featuredListings.length,
+                                        itemBuilder: (context, index) {
+                                          return TweenAnimationBuilder(
+                                            tween: Tween<double>(begin: 0, end: 1),
+                                            duration: Duration(milliseconds: 400 + (index * 100)),
+                                            curve: Curves.easeOutCubic,
+                                            builder: (context, double value, child) {
+                                              return Transform.translate(
+                                                offset: Offset(50 * (1 - value), 0),
+                                                child: Opacity(
+                                                  opacity: value,
+                                                  child: child,
+                                                ),
+                                              );
+                                            },
+                                            child: FeaturedMaterialCard(
+                                              listing: featuredListings[index],
+                                              onTap: () {
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (context) => MaterialDetailsPage(
+                                                      listing: featuredListings[index],
+                                                      heroTag: 'hero_featured_${featuredListings[index].id}',
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                  ],
                                 ),
-                                SizedBox(
-                                  height: 220,
-                                  child: ListView.builder(
-                                    scrollDirection: Axis.horizontal,
-                                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                                    itemCount: featuredListings.length,
-                                    itemBuilder: (context, index) {
+                              ),
+                            
+                            // Grid View Header
+                            if (gridListings.isNotEmpty)
+                              const SliverToBoxAdapter(
+                                child: Padding(
+                                  padding: EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0),
+                                  child: Text('All Materials', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                                ),
+                              ),
+                              
+                            // Grid View
+                            if (gridListings.isNotEmpty)
+                              SliverPadding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                sliver: SliverGrid(
+                                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    childAspectRatio: 0.8,
+                                    crossAxisSpacing: 16,
+                                    mainAxisSpacing: 16,
+                                  ),
+                                  delegate: SliverChildBuilderDelegate(
+                                    (context, index) {
                                       return TweenAnimationBuilder(
                                         tween: Tween<double>(begin: 0, end: 1),
-                                        duration: Duration(milliseconds: 400 + (index * 100)),
+                                        duration: Duration(milliseconds: 400 + (index * 50)),
                                         curve: Curves.easeOutCubic,
                                         builder: (context, double value, child) {
                                           return Transform.translate(
-                                            offset: Offset(50 * (1 - value), 0),
+                                            offset: Offset(0, 50 * (1 - value)),
                                             child: Opacity(
                                               opacity: value,
                                               child: child,
                                             ),
                                           );
                                         },
-                                        child: FeaturedMaterialCard(
-                                          listing: featuredListings[index],
+                                        child: GridMaterialCard(
+                                          listing: gridListings[index],
                                           onTap: () {
                                             Navigator.push(
                                               context,
                                               MaterialPageRoute(
                                                 builder: (context) => MaterialDetailsPage(
-                                                  listing: featuredListings[index],
-                                                  heroTag: 'hero_featured_${featuredListings[index].id}',
+                                                  listing: gridListings[index],
+                                                  heroTag: 'hero_grid_${gridListings[index].id}',
                                                 ),
                                               ),
                                             );
@@ -182,73 +247,17 @@ class _MaterialsMarketplacePageState extends State<MaterialsMarketplacePage> wit
                                         ),
                                       );
                                     },
+                                    childCount: gridListings.length,
                                   ),
                                 ),
-                                const SizedBox(height: 16),
-                              ],
-                            ),
-                          ),
-                        
-                        // Grid View Header
-                        if (gridListings.isNotEmpty)
-                          const SliverToBoxAdapter(
-                            child: Padding(
-                              padding: EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0),
-                              child: Text('All Materials', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                            ),
-                          ),
-                          
-                        // Grid View
-                        if (gridListings.isNotEmpty)
-                          SliverPadding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            sliver: SliverGrid(
-                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                childAspectRatio: 0.8,
-                                crossAxisSpacing: 16,
-                                mainAxisSpacing: 16,
                               ),
-                              delegate: SliverChildBuilderDelegate(
-                                (context, index) {
-                                  return TweenAnimationBuilder(
-                                    tween: Tween<double>(begin: 0, end: 1),
-                                    duration: Duration(milliseconds: 400 + (index * 50)),
-                                    curve: Curves.easeOutCubic,
-                                    builder: (context, double value, child) {
-                                      return Transform.translate(
-                                        offset: Offset(0, 50 * (1 - value)),
-                                        child: Opacity(
-                                          opacity: value,
-                                          child: child,
-                                        ),
-                                      );
-                                    },
-                                    child: GridMaterialCard(
-                                      listing: gridListings[index],
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => MaterialDetailsPage(
-                                              listing: gridListings[index],
-                                              heroTag: 'hero_grid_${gridListings[index].id}',
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  );
-                                },
-                                childCount: gridListings.length,
-                              ),
-                            ),
-                          ),
-                          
-                          // Bottom Padding
-                          const SliverToBoxAdapter(child: SizedBox(height: 80)),
-                      ],
-                    ),
+                              
+                              // Bottom Padding
+                              const SliverToBoxAdapter(child: SizedBox(height: 80)),
+                          ],
+                        ),
+                );
+              },
             ),
           ),
         ],
@@ -259,7 +268,9 @@ class _MaterialsMarketplacePageState extends State<MaterialsMarketplacePage> wit
         onPressed: () {
           Navigator.of(context).push(
             PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) => const AddMaterialPage(),
+              pageBuilder: (context, animation, secondaryAnimation) => AddMaterialPage(
+                initialIsIHave: _tabController.index == 0,
+              ),
               transitionsBuilder: (context, animation, secondaryAnimation, child) {
                 const begin = Offset(0.0, 1.0); // Slide up from bottom
                 const end = Offset.zero;

@@ -1,2 +1,8 @@
 figma/
 EcoLoop_Corrected_Project_Document.pdf/
+appsettings.Development.json
+.env
+
+# .NET Build Output
+bin/
+obj/

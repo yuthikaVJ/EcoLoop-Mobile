@@ -1,16 +1,24 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../materials_marketplace/domain/entities/material_listing.dart';
 import '../../../materials_marketplace/presentation/pages/material_details_page.dart';
+import '../../../materials_marketplace/presentation/providers/material_listings_provider.dart';
+import '../../../materials_marketplace/presentation/pages/add_material_page.dart';
+import '../../../profile/presentation/providers/profile_provider.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Take a few dummy items for the 'Recent Discoveries' section
-    final recentItems = dummyListings.take(4).toList();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final listingsAsyncValue = ref.watch(activeListingsNotifierProvider);
+    final profileAsyncValue = ref.watch(profileNotifierProvider);
+    
+    final rawName = profileAsyncValue.value?.businessName ?? 'Eco Warrior';
+    final nameParts = rawName.split(' ').where((p) => p.isNotEmpty).toList();
+    final displayName = nameParts.length > 2 ? '${nameParts[0]} ${nameParts[1]}' : rawName;
 
     return Scaffold(
       backgroundColor: AppColors.offWhite,
@@ -44,33 +52,48 @@ class HomePage extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text(
-                                'Good Morning,',
-                                style: TextStyle(color: AppColors.mintGreen, fontSize: 16),
-                              ),
-                              Text(
-                                'NovaFlow',
-                                style: TextStyle(
-                                  color: AppColors.white,
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.2,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Good Morning,',
+                                  style: TextStyle(color: AppColors.mintGreen, fontSize: 16),
                                 ),
-                              ),
-                            ],
+                                Text(
+                                  displayName,
+                                  style: const TextStyle(
+                                    color: AppColors.white,
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.2,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 16),
                           Container(
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               border: Border.all(color: AppColors.mintGreen, width: 2),
                             ),
-                            child: const CircleAvatar(
+                            child: CircleAvatar(
                               radius: 24,
                               backgroundColor: AppColors.ecoGreen,
-                              child: Text('NF', style: TextStyle(color: AppColors.white, fontWeight: FontWeight.bold)),
+                              backgroundImage: profileAsyncValue.value?.logoUrl != null
+                                  ? NetworkImage(profileAsyncValue.value!.logoUrl!)
+                                  : null,
+                              child: profileAsyncValue.value?.logoUrl == null
+                                  ? Text(
+                                      (profileAsyncValue.value?.businessName.isNotEmpty == true)
+                                          ? profileAsyncValue.value!.businessName[0].toUpperCase()
+                                          : 'U',
+                                      style: const TextStyle(color: AppColors.white, fontWeight: FontWeight.bold),
+                                    )
+                                  : null,
                             ),
                           ),
                         ],
@@ -153,11 +176,29 @@ class HomePage extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
                 children: [
-                  _buildQuickAction(context, 'Post Material', Icons.add_box_rounded, AppColors.forestGreen),
+                  _buildQuickAction(
+                    context, 
+                    'Post Material', 
+                    Icons.add_box_rounded, 
+                    AppColors.forestGreen,
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddMaterialPage())),
+                  ),
                   const SizedBox(width: 16),
-                  _buildQuickAction(context, 'Buy Products', Icons.shopping_bag_rounded, AppColors.rewardGold),
+                  _buildQuickAction(
+                    context, 
+                    'Buy Products', 
+                    Icons.shopping_bag_rounded, 
+                    AppColors.rewardGold,
+                    onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Products coming soon!'))),
+                  ),
                   const SizedBox(width: 16),
-                  _buildQuickAction(context, 'Track Order', Icons.local_shipping_rounded, AppColors.ecoGreen),
+                  _buildQuickAction(
+                    context, 
+                    'Track Order', 
+                    Icons.local_shipping_rounded, 
+                    AppColors.ecoGreen,
+                    onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Order tracking coming soon!'))),
+                  ),
                 ],
               ),
             ),
@@ -186,13 +227,23 @@ class HomePage extends StatelessWidget {
             const SizedBox(height: 12),
             SizedBox(
               height: 220,
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                itemCount: recentItems.length,
-                itemBuilder: (context, index) {
-                  return _buildTrendingCard(context, recentItems[index]);
+              child: listingsAsyncValue.when(
+                loading: () => const Center(child: CircularProgressIndicator(color: AppColors.forestGreen)),
+                error: (err, stack) => Center(child: Text('Error: $err')),
+                data: (allListings) {
+                  final recentItems = allListings.take(4).toList();
+                  if (recentItems.isEmpty) {
+                    return const Center(child: Text('No recent items'));
+                  }
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: recentItems.length,
+                    itemBuilder: (context, index) {
+                      return _buildTrendingCard(context, recentItems[index]);
+                    },
+                  );
                 },
               ),
             ),
@@ -243,7 +294,7 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickAction(BuildContext context, String title, IconData icon, Color color) {
+  Widget _buildQuickAction(BuildContext context, String title, IconData icon, Color color, {required VoidCallback onTap}) {
     return Container(
       width: 100,
       decoration: BoxDecoration(
@@ -255,7 +306,7 @@ class HomePage extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: () {},
+          onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -311,9 +362,15 @@ class HomePage extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // Background Image Placeholder (Icon)
-            const Center(
-              child: Icon(Icons.image_outlined, size: 64, color: AppColors.ecoGreen),
+            // Background Image
+            Positioned.fill(
+              child: Image.network(
+                listing.imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Center(child: Icon(Icons.image_outlined, size: 64, color: AppColors.ecoGreen));
+                },
+              ),
             ),
             // Dark Gradient Overlay
             Container(

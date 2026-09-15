@@ -108,7 +108,7 @@ class _ChatPageState extends State<ChatPage> {
               backgroundColor: AppColors.mintGreen,
               radius: 18,
               child: Text(
-                widget.listing.companyName.substring(0, 1),
+                (widget.listing.companyName?.isNotEmpty == true) ? widget.listing.companyName!.substring(0, 1) : 'U',
                 style: const TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.bold),
               ),
             ),
@@ -118,7 +118,7 @@ class _ChatPageState extends State<ChatPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.listing.companyName,
+                    widget.listing.companyName ?? 'Unknown Company',
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const Text(
@@ -293,7 +293,7 @@ class _ChatPageState extends State<ChatPage> {
                   backgroundColor: AppColors.mintGreen,
                   radius: 12,
                   child: Text(
-                    widget.listing.companyName.substring(0, 1),
+                    (widget.listing.companyName?.isNotEmpty == true) ? widget.listing.companyName!.substring(0, 1) : 'U',
                     style: const TextStyle(color: AppColors.forestGreen, fontSize: 10, fontWeight: FontWeight.bold),
                   ),
                 ),

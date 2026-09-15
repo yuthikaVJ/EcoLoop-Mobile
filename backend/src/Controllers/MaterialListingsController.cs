@@ -1,9 +1,12 @@
 using EcoLoop.Api.DTOs;
 using EcoLoop.Api.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace EcoLoop.Api.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class MaterialListingsController : ControllerBase
@@ -56,6 +59,17 @@ public class MaterialListingsController : ControllerBase
             }
 
             request.ImageUrl = $"http://10.0.2.2:5252/uploads/material_listings/{uniqueFileName}";
+        }
+
+        // Extract BusinessId from JWT claims
+        var businessIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (Guid.TryParse(businessIdClaim, out var businessId))
+        {
+            request.BusinessId = businessId;
+        }
+        else
+        {
+            return Unauthorized(new { message = "Invalid token or Business ID missing." });
         }
 
         var listing = await _listingService.CreateAsync(request);

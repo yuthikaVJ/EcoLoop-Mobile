@@ -44,7 +44,13 @@ class MaterialDetailsPage extends StatelessWidget {
                     tag: heroTag,
                     child: Container(
                       color: AppColors.mintGreen,
-                      child: const Icon(Icons.image_outlined, size: 100, color: AppColors.ecoGreen),
+                      child: Image.network(
+                        listing.imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(Icons.image_outlined, size: 100, color: AppColors.ecoGreen);
+                        },
+                      ),
                     ),
                   ),
                   // Dark gradient overlay for text readability if we add title to FlexibleSpaceBar
@@ -164,11 +170,11 @@ class MaterialDetailsPage extends StatelessWidget {
                     leading: CircleAvatar(
                       backgroundColor: AppColors.mintGreen,
                       child: Text(
-                        listing.companyName.substring(0, 1),
+                        (listing.companyName?.isNotEmpty == true) ? listing.companyName!.substring(0, 1) : 'U',
                         style: const TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.bold),
                       ),
                     ),
-                    title: Text(listing.companyName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    title: Text(listing.companyName ?? 'Unknown Company', style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: const Text('Member since 2024 • 4.8 Rating'),
                     trailing: const Icon(Icons.chevron_right),
                   ),

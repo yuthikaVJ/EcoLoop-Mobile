@@ -18,6 +18,8 @@ public class EcoLoopDbContext : DbContext
     public DbSet<Business> Businesses => Set<Business>();
     public DbSet<MaterialListing> MaterialListings => Set<MaterialListing>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+    public DbSet<DeviceToken> DeviceTokens => Set<DeviceToken>();
 
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)
@@ -82,5 +84,37 @@ public class EcoLoopDbContext : DbContext
 
         modelBuilder.Entity<MaterialListing>()
             .HasIndex(listing => listing.BusinessId);
+
+        // ── ChatMessage configuration ──
+        modelBuilder.Entity<ChatMessage>()
+            .HasOne(m => m.Listing)
+            .WithMany()
+            .HasForeignKey(m => m.ListingId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ChatMessage>()
+            .HasOne(m => m.Sender)
+            .WithMany()
+            .HasForeignKey(m => m.SenderId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ChatMessage>()
+            .HasOne(m => m.Receiver)
+            .WithMany()
+            .HasForeignKey(m => m.ReceiverId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ChatMessage>()
+            .HasIndex(m => m.ListingId);
+
+        // ── DeviceToken configuration ──
+        modelBuilder.Entity<DeviceToken>()
+            .HasOne(d => d.Business)
+            .WithMany()
+            .HasForeignKey(d => d.BusinessId)
+            .OnDelete(DeleteBehavior.Cascade);
+            
+        modelBuilder.Entity<DeviceToken>()
+            .HasIndex(d => d.BusinessId);
     }
 }

@@ -32,7 +32,7 @@ class HomePage extends ConsumerWidget {
               children: [
                 // Header Background
                 Container(
-                  height: 260,
+                  height: 310,
                   width: double.infinity,
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
@@ -56,6 +56,20 @@ class HomePage extends ConsumerWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                Row(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: Image.asset('assets/images/logo_rounded.png', height: 32, width: 32, fit: BoxFit.cover),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text(
+                                      'ECOLOOP',
+                                      style: TextStyle(color: AppColors.mintGreen, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.5),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
                                 const Text(
                                   'Good Morning,',
                                   style: TextStyle(color: AppColors.mintGreen, fontSize: 16),
@@ -104,53 +118,50 @@ class HomePage extends ConsumerWidget {
                 
                 // 2. Overlapping Glassmorphism Stats Card
                 Positioned(
-                  top: 150,
+                  top: 200,
                   left: 24,
                   right: 24,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(24),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                      child: Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: AppColors.white.withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: AppColors.white.withOpacity(0.5)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.darkCharcoal.withOpacity(0.15),
-                              blurRadius: 20,
-                              offset: const Offset(0, 10),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: const [
-                                Icon(Icons.eco, color: AppColors.ecoGreen, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Your Impact This Month',
-                                  style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.slateGray),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceAround,
-                              children: [
-                                _buildStatColumn('Recycled', '450', 'kg', Icons.recycling),
-                                _buildStatDivider(),
-                                _buildStatColumn('Saved', '12', 'trees', Icons.park),
-                                _buildStatDivider(),
-                                _buildStatColumn('Earned', '\$1.2k', '', Icons.attach_money),
-                              ],
-                            ),
-                          ],
-                        ),
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: AppColors.white.withOpacity(0.95), // Slightly more opaque since no blur
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: AppColors.white.withOpacity(0.5)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.darkCharcoal.withOpacity(0.15),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(Icons.eco, color: AppColors.ecoGreen, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Your Impact This Month',
+                                style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.slateGray),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _buildStatColumn('Recycled', '450', 'kg', Icons.recycling),
+                              _buildStatDivider(),
+                              _buildStatColumn('Saved', '12', 'trees', Icons.park),
+                              _buildStatDivider(),
+                              _buildStatColumn('Earned', '\$1.2k', '', Icons.attach_money),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ),

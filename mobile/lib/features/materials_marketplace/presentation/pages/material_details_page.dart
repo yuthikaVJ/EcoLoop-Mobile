@@ -206,7 +206,10 @@ class MaterialDetailsPage extends StatelessWidget {
           onPressed: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => ChatPage(listing: listing)),
+              MaterialPageRoute(builder: (context) => ChatPage(
+                listing: listing,
+                receiverId: listing.businessId ?? '',
+              )),
             );
           },
           child: const Text('Contact Seller', style: TextStyle(fontSize: 16, color: AppColors.white, fontWeight: FontWeight.bold)),

@@ -1,19 +1,36 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:signalr_netcore/signalr_client.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/material_listing.dart';
+import 'package:intl/intl.dart';
 
 class ChatMessage {
+  final String id;
   final String text;
   final bool isMe;
   final String time;
 
-  ChatMessage({required this.text, required this.isMe, required this.time});
+  ChatMessage({required this.id, required this.text, required this.isMe, required this.time});
+  
+  factory ChatMessage.fromJson(Map<String, dynamic> json) {
+    final createdAt = DateTime.parse(json['createdAt']).toLocal();
+    return ChatMessage(
+      id: json['id'] ?? '',
+      text: json['content'] ?? '',
+      isMe: json['isMe'] ?? false,
+      time: DateFormat.jm().format(createdAt),
+    );
+  }
 }
 
 class ChatPage extends StatefulWidget {
   final MaterialListing listing;
+  final String receiverId;
 
-  const ChatPage({super.key, required this.listing});
+  const ChatPage({super.key, required this.listing, required this.receiverId});
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -23,59 +40,91 @@ class _ChatPageState extends State<ChatPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   
-  late List<ChatMessage> _messages;
+  List<ChatMessage> _messages = [];
+  HubConnection? _hubConnection;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    // Dummy messages
-    _messages = [
-      ChatMessage(
-        text: 'Hi, I am interested in your ${widget.listing.title}. Is it still available?',
-        isMe: true,
-        time: '10:00 AM',
-      ),
-      ChatMessage(
-        text: 'Hello! Yes, it is still available.',
-        isMe: false,
-        time: '10:05 AM',
-      ),
-      ChatMessage(
-        text: 'Great. Are you flexible on the price?',
-        isMe: true,
-        time: '10:06 AM',
-      ),
-      ChatMessage(
-        text: 'I can do \$${(widget.listing.price * 0.9).toStringAsFixed(0)}/${widget.listing.priceUnit} if you pick it up today.',
-        isMe: false,
-        time: '10:10 AM',
-      ),
-    ];
+    _initChat();
   }
 
-  @override
-  void dispose() {
-    _messageController.dispose();
-    _scrollController.dispose();
-    super.dispose();
+  Future<void> _initChat() async {
+    await _fetchHistory();
+    await _connectSignalR();
   }
 
-  void _sendMessage() {
-    if (_messageController.text.trim().isEmpty) return;
-
-    setState(() {
-      _messages.add(
-        ChatMessage(
-          text: _messageController.text,
-          isMe: true,
-          time: _formatCurrentTime(),
-        ),
+  Future<void> _fetchHistory() async {
+    try {
+      final token = await const FlutterSecureStorage().read(key: 'access_token');
+      final response = await http.get(
+        Uri.parse('http://10.0.2.2:5252/api/chat/history/${widget.listing.id}'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
       );
-    });
 
-    _messageController.clear();
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _messages = data.map((json) => ChatMessage.fromJson(json)).toList();
+          _isLoading = false;
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      print('Error fetching history: $e');
+      setState(() { _isLoading = false; });
+    }
+  }
+
+  Future<void> _connectSignalR() async {
+    final token = await const FlutterSecureStorage().read(key: 'access_token');
     
-    // Scroll to bottom
+    _hubConnection = HubConnectionBuilder()
+        .withUrl(
+            "http://10.0.2.2:5252/chatHub",
+            options: HttpConnectionOptions(
+                accessTokenFactory: () async => token ?? '',
+            ),
+        )
+        .build();
+
+    _hubConnection!.on("ReceiveMessage", _handleReceiveMessage);
+    
+    try {
+      await _hubConnection!.start();
+      print("SignalR Connected");
+    } catch (e) {
+      print("SignalR Connection Error: $e");
+    }
+  }
+
+  void _handleReceiveMessage(List<Object?>? args) {
+    if (args != null && args.isNotEmpty) {
+      final msgData = args[0] as Map<String, dynamic>;
+      
+      // Check if this message is for the current listing chat
+      if (msgData['listingId']?.toString().toLowerCase() != widget.listing.id.toLowerCase()) return;
+
+      // Ensure we don't duplicate messages (if we sent it, we might get it back via hub and locally, but signalr echoes it anyway)
+      final newMsgId = msgData['id']?.toString() ?? '';
+      if (_messages.any((m) => m.id == newMsgId)) return;
+
+      setState(() {
+        _messages.add(ChatMessage(
+          id: newMsgId,
+          text: msgData['content'] ?? '',
+          isMe: false, // The server payload for ReceiveMessage doesn't have IsMe, but since sender gets it echoed we can fix this below
+          time: DateFormat.jm().format(DateTime.parse(msgData['createdAt']).toLocal()),
+        ));
+      });
+      _scrollToBottom();
+    }
+  }
+
+  void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -87,14 +136,44 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
-  String _formatCurrentTime() {
-    final now = DateTime.now();
-    int hour = now.hour;
-    final String period = hour >= 12 ? 'PM' : 'AM';
-    if (hour > 12) hour -= 12;
-    if (hour == 0) hour = 12;
-    final String minute = now.minute.toString().padLeft(2, '0');
-    return '$hour:$minute $period';
+  @override
+  void dispose() {
+    _hubConnection?.stop();
+    _messageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _sendMessage() async {
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
+
+    _messageController.clear();
+    
+    // Add locally immediately for responsive UI
+    final tempId = DateTime.now().millisecondsSinceEpoch.toString();
+    setState(() {
+      _messages.add(
+        ChatMessage(
+          id: tempId,
+          text: text,
+          isMe: true,
+          time: DateFormat.jm().format(DateTime.now()),
+        ),
+      );
+    });
+    _scrollToBottom();
+
+    if (_hubConnection?.state == HubConnectionState.Connected) {
+      try {
+        await _hubConnection!.invoke(
+          "SendMessage",
+          args: [widget.listing.id, widget.receiverId, text],
+        );
+      } catch (e) {
+        print("Send error: $e");
+      }
+    }
   }
 
   @override
@@ -200,15 +279,17 @@ class _ChatPageState extends State<ChatPage> {
           
           // Chat Messages
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final message = _messages[index];
-                return _buildChatBubble(message);
-              },
-            ),
+            child: _isLoading 
+                ? const Center(child: CircularProgressIndicator(color: AppColors.forestGreen))
+                : ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      final message = _messages[index];
+                      return _buildChatBubble(message);
+                    },
+                  ),
           ),
           
           // Input Area

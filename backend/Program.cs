@@ -5,11 +5,25 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using FirebaseAdmin;
+using Google.Apis.Auth.OAuth2;
 
 DotNetEnv.Env.Load();
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<NotificationService>();
+
+// Initialize Firebase Admin SDK
+var firebaseKeyPath = Path.Combine(builder.Environment.ContentRootPath, "firebase-key.json");
+if (File.Exists(firebaseKeyPath))
+{
+    FirebaseApp.Create(new AppOptions()
+    {
+        Credential = GoogleCredential.FromFile(firebaseKeyPath)
+    });
+}
 
 builder.Services.AddDbContext<EcoLoopDbContext>(options =>
     options.UseNpgsql(
@@ -64,6 +78,7 @@ app.UseCors("MobileApp");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<EcoLoop.Api.Hubs.ChatHub>("/chatHub");
 
 // Seed a dummy business so the frontend can create listings with Guid.Empty
 using (var scope = app.Services.CreateScope())

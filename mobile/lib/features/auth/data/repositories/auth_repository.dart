@@ -9,6 +9,7 @@ class AuthRepository {
   final String _baseUrl = 'http://10.0.2.2:5252/api/auth';
   
   bool _initialized = false;
+  Future<bool>? _refreshFuture;
 
   Future<void> _ensureInitialized() async {
     if (!_initialized) {
@@ -79,7 +80,17 @@ class AuthRepository {
     await _storage.delete(key: 'refresh_token');
   }
 
-  Future<bool> refreshToken() async {
+  Future<bool> refreshToken() {
+    if (_refreshFuture != null) {
+      return _refreshFuture!;
+    }
+    _refreshFuture = _doRefreshToken().whenComplete(() {
+      _refreshFuture = null;
+    });
+    return _refreshFuture!;
+  }
+
+  Future<bool> _doRefreshToken() async {
     final accessToken = await getSavedToken();
     final refreshToken = await getSavedRefreshToken();
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/material_listing.dart';
+import '../../../sustainable_products/presentation/widgets/product_image_widget.dart';
 
 class FeaturedMaterialCard extends StatelessWidget {
   final MaterialListing listing;
@@ -24,7 +25,7 @@ class FeaturedMaterialCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: AppColors.slateGray.withOpacity(0.15),
+              color: AppColors.slateGray.withValues(alpha: 0.15),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -43,14 +44,9 @@ class FeaturedMaterialCard extends StatelessWidget {
                     borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                   ),
                   clipBehavior: Clip.hardEdge,
-                  child: Image.network(
-                    listing.imageUrl,
+                  child: ProductImageWidget(
+                    imageUrl: listing.imageUrl,
                     fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Center(child: Icon(Icons.inventory_2_outlined, size: 48, color: AppColors.ecoGreen));
-                    },
                   ),
                 ),
               ),

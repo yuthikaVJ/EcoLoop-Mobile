@@ -8,6 +8,12 @@ public class CreateProductRequest
     public string Description { get; set; } = string.Empty;
     public string MaterialType { get; set; } = string.Empty;
     public decimal Price { get; set; }
+    public int AvailableQuantity { get; set; } = 1;
+}
+
+public class PurchaseRequest
+{
+    public int Quantity { get; set; } = 1;
 }
 
 public class UpdateProductRequest

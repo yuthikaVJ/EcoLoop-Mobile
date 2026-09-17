@@ -9,7 +9,9 @@ import '../../../materials_marketplace/presentation/pages/add_material_page.dart
 import '../../../profile/presentation/providers/profile_provider.dart';
 
 class HomePage extends ConsumerWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, this.onNavigate});
+
+  final void Function(int bottomIndex, {int? topIndex})? onNavigate;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -200,7 +202,11 @@ class HomePage extends ConsumerWidget {
                     'Buy Products', 
                     Icons.shopping_bag_rounded, 
                     AppColors.rewardGold,
-                    onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Products coming soon!'))),
+                    onTap: () {
+                      if (onNavigate != null) {
+                        onNavigate!(1, topIndex: 0);
+                      }
+                    },
                   ),
                   const SizedBox(width: 16),
                   _buildQuickAction(
@@ -228,7 +234,9 @@ class HomePage extends ConsumerWidget {
                   ),
                   TextButton(
                     onPressed: () {
-                      // We will let AppShell handle the navigation or just switch tabs
+                      if (onNavigate != null) {
+                        onNavigate!(1, topIndex: 1); // 1 = Marketplace, 1 = Materials
+                      }
                     },
                     child: const Text('View All', style: TextStyle(color: AppColors.ecoGreen, fontWeight: FontWeight.bold)),
                   )

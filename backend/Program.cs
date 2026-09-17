@@ -95,6 +95,27 @@ using (var scope = app.Services.CreateScope())
         });
         context.SaveChanges();
     }
+
+    // Seed default product categories
+    var defaultCategories = new[]
+    {
+        "Electronics", "Clothing & Apparel", "Home & Garden",
+        "Food & Beverages", "Health & Beauty", "Sports & Outdoors",
+        "Furniture", "Stationery", "Toys & Games", "Other"
+    };
+
+    foreach (var catName in defaultCategories)
+    {
+        if (!context.ProductCategories.Any(c => c.Name == catName))
+        {
+            context.ProductCategories.Add(new EcoLoop.Api.Models.ProductCategory
+            {
+                Name = catName,
+                Description = $"Sustainable {catName} products"
+            });
+        }
+    }
+    context.SaveChanges();
 }
 
 app.MapGet("/api/seed-business", (EcoLoopDbContext db) => {

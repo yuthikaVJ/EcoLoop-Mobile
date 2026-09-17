@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../features/home/presentation/pages/home_page.dart';
-import '../../features/materials_marketplace/presentation/pages/materials_marketplace_page.dart';
-import '../../features/materials_marketplace/presentation/pages/chat_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/materials_marketplace/presentation/pages/inbox_page.dart';
+import 'marketplace_page.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
@@ -18,12 +17,23 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  int _currentIndex = 0; // Default to Home Dashboard
+  int _currentIndex = 0;
 
-  final List<Widget> _pages = [
-    const HomePage(),
-    const MaterialsMarketplacePage(),
-    const Center(child: Text('Products (Coming Soon)')),
+  int _marketplaceTabIndex = 0;
+
+  List<Widget> get _pages => [
+    HomePage(
+      onNavigate: (bottomIndex, {topIndex}) {
+        setState(() {
+          _currentIndex = bottomIndex;
+          if (topIndex != null) _marketplaceTabIndex = topIndex;
+        });
+      },
+    ),
+    MarketplacePage(
+      key: ValueKey('marketplace_$_marketplaceTabIndex'),
+      initialTabIndex: _marketplaceTabIndex,
+    ),
     const InboxPage(),
     const ProfilePage(),
   ];
@@ -38,21 +48,22 @@ class _AppShellState extends State<AppShell> {
     try {
       final token = await FirebaseMessaging.instance.getToken();
       if (token != null) {
-        final authToken = await const FlutterSecureStorage().read(key: 'access_token');
+        final authToken =
+            await const FlutterSecureStorage().read(key: 'access_token');
         if (authToken != null) {
           await http.post(
-            Uri.parse('http://10.0.2.2:5252/api/notifications/register-device'),
+            Uri.parse(
+                'http://10.0.2.2:5252/api/notifications/register-device'),
             headers: {
               'Content-Type': 'application/json',
               'Authorization': 'Bearer $authToken',
             },
             body: jsonEncode({'token': token}),
           );
-          print("FCM Token registered with backend");
         }
       }
-    } catch (e) {
-      print("Failed to register FCM token: $e");
+    } catch (_) {
+      // Non-fatal
     }
   }
 
@@ -62,11 +73,7 @@ class _AppShellState extends State<AppShell> {
       body: _pages[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+        onTap: (index) => setState(() => _currentIndex = index),
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home_outlined),
@@ -74,14 +81,9 @@ class _AppShellState extends State<AppShell> {
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.recycling_outlined),
-            activeIcon: Icon(Icons.recycling),
-            label: 'Materials',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_bag_outlined),
-            activeIcon: Icon(Icons.shopping_bag),
-            label: 'Products',
+            icon: Icon(Icons.storefront_outlined),
+            activeIcon: Icon(Icons.storefront),
+            label: 'Marketplace',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.notifications_outlined),

@@ -4,8 +4,10 @@ import '../../features/auth/data/repositories/auth_repository.dart';
 
 class ApiClient {
   final AuthRepository _authRepository;
+  final String baseUrl;
 
-  ApiClient(this._authRepository);
+  ApiClient(this._authRepository, {String? baseUrl}) 
+      : baseUrl = baseUrl ?? 'http://10.0.2.2:5252';
 
   Future<Map<String, String>> getAuthHeaders() async {
     final token = await _authRepository.getSavedToken();
@@ -14,8 +16,20 @@ class ApiClient {
       if (token != null) 'Authorization': 'Bearer $token',
     };
   }
+  
+  String _buildUrl(String path, Map<String, dynamic>? queryParameters) {
+    String url = path.startsWith('http') ? path : '$baseUrl$path';
+    if (queryParameters != null && queryParameters.isNotEmpty) {
+      final uri = Uri.parse(url).replace(
+        queryParameters: queryParameters.map((k, v) => MapEntry(k, v.toString())),
+      );
+      return uri.toString();
+    }
+    return url;
+  }
 
-  Future<http.Response> get(String url) async {
+  Future<http.Response> get(String path, {Map<String, dynamic>? queryParameters}) async {
+    String url = _buildUrl(path, queryParameters);
     var response = await http.get(Uri.parse(url), headers: await getAuthHeaders());
     if (response.statusCode == 401) {
       final refreshed = await _authRepository.refreshToken();
@@ -26,7 +40,8 @@ class ApiClient {
     return response;
   }
 
-  Future<http.Response> post(String url, {Object? body}) async {
+  Future<http.Response> post(String path, {Object? body}) async {
+    String url = _buildUrl(path, null);
     var response = await http.post(
       Uri.parse(url), 
       headers: await getAuthHeaders(), 
@@ -45,7 +60,8 @@ class ApiClient {
     return response;
   }
 
-  Future<http.Response> put(String url, {Object? body}) async {
+  Future<http.Response> put(String path, {Object? body}) async {
+    String url = _buildUrl(path, null);
     var response = await http.put(
       Uri.parse(url), 
       headers: await getAuthHeaders(), 
@@ -64,7 +80,8 @@ class ApiClient {
     return response;
   }
 
-  Future<http.Response> patch(String url, {Object? body}) async {
+  Future<http.Response> patch(String path, {Object? body}) async {
+    String url = _buildUrl(path, null);
     var response = await http.patch(
       Uri.parse(url), 
       headers: await getAuthHeaders(), 
@@ -82,4 +99,17 @@ class ApiClient {
     }
     return response;
   }
+}
+
+class ApiException implements Exception {
+  final int statusCode;
+  final String message;
+
+  const ApiException({
+    required this.statusCode,
+    required this.message,
+  });
+
+  @override
+  String toString() => 'ApiException ($statusCode): $message';
 }

@@ -18,4 +18,5 @@ public interface IProductService
     Task<ProductDetailsDto> CreateAsync(CreateProductRequest request);
     Task<ProductDetailsDto?> UpdateAsync(Guid id, UpdateProductRequest request);
     Task<bool> DisableAsync(Guid id);
+    Task<bool> PurchaseAsync(Guid productId, int quantity);
 }

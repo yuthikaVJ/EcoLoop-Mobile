@@ -35,6 +35,8 @@ class MaterialListingsNotifier extends AsyncNotifier<List<MaterialListing>> {
 
   @override
   Future<List<MaterialListing>> build() async {
+    // Artificial delay to show skeleton loading (per user request)
+    await Future.delayed(const Duration(milliseconds: 1500));
     return _repository.getListings();
   }
 

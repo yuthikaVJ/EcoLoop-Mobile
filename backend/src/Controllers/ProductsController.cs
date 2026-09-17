@@ -85,4 +85,14 @@ public class ProductsController : ControllerBase
             ? NoContent()
             : NotFound(new { message = "Product not found." });
     }
+
+    [HttpPost("{id:guid}/purchase")]
+    public async Task<IActionResult> PurchaseProduct(Guid id, [FromBody] PurchaseRequest request)
+    {
+        var success = await _service.PurchaseAsync(id, request.Quantity);
+
+        return success
+            ? Ok(new { message = "Purchase successful." })
+            : BadRequest(new { message = "Insufficient stock or product unavailable." });
+    }
 }

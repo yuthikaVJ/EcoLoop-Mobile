@@ -150,7 +150,12 @@ public class ProductService : IProductService
             MaterialType = request.MaterialType,
             Price = request.Price,
             IsActive = true,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            Inventory = new Inventory
+            {
+                Quantity = request.AvailableQuantity,
+                IsAvailable = request.AvailableQuantity > 0
+            }
         };
 
         _db.Products.Add(product);
@@ -191,6 +196,27 @@ public class ProductService : IProductService
         product.IsActive = false;
         await _db.SaveChangesAsync();
 
+        return true;
+    }
+
+    public async Task<bool> PurchaseAsync(Guid productId, int quantity)
+    {
+        if (quantity <= 0) return false;
+
+        var inventory = await _db.Inventories
+            .FirstOrDefaultAsync(i => i.ProductId == productId);
+
+        if (inventory == null || inventory.Quantity < quantity || !inventory.IsAvailable)
+            return false;
+
+        inventory.Quantity -= quantity;
+        if (inventory.Quantity <= 0)
+        {
+            inventory.IsAvailable = false;
+            inventory.Quantity = 0;
+        }
+
+        await _db.SaveChangesAsync();
         return true;
     }
 }

@@ -1,2 +1,61 @@
+# Project-only design/reference files
 figma/
-EcoLoop_Corrected_Project_Document.pdf/
+EcoLoop_Corrected_Project_Document.pdf
+
+# .NET build output
+**/bin/
+**/obj/
+**/TestResults/
+*.trx
+
+# Visual Studio / Rider / IntelliJ / VS Code
+.vs/
+.idea/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+
+# Flutter / Dart generated files
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/build/
+**/coverage/
+
+# Android local and signing configuration
+**/.gradle/
+**/local.properties
+**/key.properties
+*.jks
+*.keystore
+
+# iOS generated dependencies and local configuration
+**/Pods/
+**/.symlinks/
+**/Flutter/ephemeral/
+**/Flutter/Generated.xcconfig
+**/Flutter/flutter_export_environment.sh
+
+# Environment files and local secrets
+.env
+.env.*
+!.env.example
+**/appsettings.Local.json
+**/appsettings.*.Local.json
+**/secrets.json
+**/google-services.json
+**/GoogleService-Info.plist
+
+# Runtime/generated content
+backend/wwwroot/uploads/
+*.log
+*.tmp
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini

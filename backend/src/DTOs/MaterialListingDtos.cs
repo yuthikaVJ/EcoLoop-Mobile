@@ -13,6 +13,7 @@ public class CreateMaterialListingRequest
     public decimal Price { get; set; }
     public string PriceUnit { get; set; } = string.Empty;
     public string DeliveryMethod { get; set; } = string.Empty;
+    public bool SellerDeliveryAvailable { get; set; }
     public int Type { get; set; } // 0 = IHave, 1 = INeed
     public string? ImageUrl { get; set; }
 }
@@ -29,6 +30,7 @@ public class UpdateMaterialListingRequest
     public decimal Price { get; set; }
     public string PriceUnit { get; set; } = string.Empty;
     public string DeliveryMethod { get; set; } = string.Empty;
+    public bool SellerDeliveryAvailable { get; set; }
     public string? ImageUrl { get; set; }
 }
 
@@ -48,6 +50,7 @@ public class MaterialListingListDto
     public int Status { get; set; }
     public DateTime CreatedAt { get; set; }
     public string? ImageUrl { get; set; }
+    public bool SellerDeliveryAvailable { get; set; }
 }
 
 // Full DTO for details page
@@ -64,6 +67,7 @@ public class MaterialListingDetailsDto
     public decimal Price { get; set; }
     public string PriceUnit { get; set; } = string.Empty;
     public string DeliveryMethod { get; set; } = string.Empty;
+    public bool SellerDeliveryAvailable { get; set; }
     public string? Seller { get; set; }
     public bool SellerIsVerified { get; set; }
     public int Type { get; set; }

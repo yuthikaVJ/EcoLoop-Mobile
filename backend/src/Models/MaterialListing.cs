@@ -14,6 +14,7 @@ public class MaterialListing
     public decimal Price { get; set; }
     public string PriceUnit { get; set; } = string.Empty;      // e.g. "Ton", "Kg", "Unit"
     public string DeliveryMethod { get; set; } = string.Empty; // e.g. "Self Pickup", "Seller Delivery"
+    public bool SellerDeliveryAvailable { get; set; }
 
     public ListingType Type { get; set; } = ListingType.IHave;
     public ListingStatus Status { get; set; } = ListingStatus.Active;
@@ -25,6 +26,7 @@ public class MaterialListing
 
     // Navigation
     public Business? Business { get; set; }
+    public List<MaterialTransaction> Transactions { get; set; } = [];
 }
 
 public enum ListingType

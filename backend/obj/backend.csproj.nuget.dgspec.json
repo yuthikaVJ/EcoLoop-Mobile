@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\User\\Desktop\\ECOLOOP\\backend\\backend.csproj": {}
+    "D:\\Eco Loop mobile app\\EcoLoop-Mobile\\backend\\backend.csproj": {}
   },
   "projects": {
-    "C:\\Users\\User\\Desktop\\ECOLOOP\\backend\\backend.csproj": {
+    "D:\\Eco Loop mobile app\\EcoLoop-Mobile\\backend\\backend.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\User\\Desktop\\ECOLOOP\\backend\\backend.csproj",
+        "projectUniqueName": "D:\\Eco Loop mobile app\\EcoLoop-Mobile\\backend\\backend.csproj",
         "projectName": "backend",
-        "projectPath": "C:\\Users\\User\\Desktop\\ECOLOOP\\backend\\backend.csproj",
-        "packagesPath": "C:\\Users\\User\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\User\\Desktop\\ECOLOOP\\backend\\obj\\",
+        "projectPath": "D:\\Eco Loop mobile app\\EcoLoop-Mobile\\backend\\backend.csproj",
+        "packagesPath": "C:\\Users\\Induwara\\.nuget\\packages\\",
+        "outputPath": "D:\\Eco Loop mobile app\\EcoLoop-Mobile\\backend\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\User\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\Induwara\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net10.0"
@@ -39,7 +39,7 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.300"
+        "SdkAnalysisLevel": "10.0.400"
       },
       "frameworks": {
         "net10.0": {
@@ -84,7 +84,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.401/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.AspNetCore": "(,10.0.32767]",
             "Microsoft.AspNetCore.Antiforgery": "(,10.0.32767]",

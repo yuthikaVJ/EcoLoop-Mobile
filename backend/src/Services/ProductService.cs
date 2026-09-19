@@ -92,7 +92,8 @@ public class ProductService : IProductService
                 PrimaryImageUrl = product.Images
                     .Where(image => image.IsPrimary)
                     .Select(image => image.ImageUrl)
-                    .FirstOrDefault()
+                    .FirstOrDefault(),
+                SellerDeliveryAvailable = product.SellerDeliveryAvailable
             })
             .ToListAsync();
 
@@ -133,7 +134,8 @@ public class ProductService : IProductService
                 Images = product.Images
                     .OrderBy(image => image.DisplayOrder)
                     .Select(image => image.ImageUrl)
-                    .ToList()
+                    .ToList(),
+                SellerDeliveryAvailable = product.SellerDeliveryAvailable
             })
             .FirstOrDefaultAsync();
     }
@@ -149,6 +151,7 @@ public class ProductService : IProductService
             Description = request.Description,
             MaterialType = request.MaterialType,
             Price = request.Price,
+            SellerDeliveryAvailable = request.SellerDeliveryAvailable,
             IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
@@ -174,6 +177,7 @@ public class ProductService : IProductService
         product.Description = request.Description;
         product.MaterialType = request.MaterialType;
         product.Price = request.Price;
+        product.SellerDeliveryAvailable = request.SellerDeliveryAvailable;
 
         await _db.SaveChangesAsync();
 

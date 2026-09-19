@@ -16,6 +16,8 @@ builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IProductImageService, ProductImageService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IMaterialListingService, MaterialListingService>();
+builder.Services.AddScoped<IMaterialTransactionService, MaterialTransactionService>();
+builder.Services.AddScoped<IProductOrderService, ProductOrderService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -54,6 +56,18 @@ using (var scope = app.Services.CreateScope())
             Id = dummyBusinessId, 
             BusinessName = "EcoLoop Default Business", 
             IsVerified = true 
+        });
+        context.SaveChanges();
+    }
+    // Temporary mobile demo identity until the team's authentication component is integrated.
+    var demoBuyerId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+    if (!context.Businesses.Any(b => b.Id == demoBuyerId))
+    {
+        context.Businesses.Add(new EcoLoop.Api.Models.Business
+        {
+            Id = demoBuyerId,
+            BusinessName = "EcoLoop Demo Buyer",
+            IsVerified = true
         });
         context.SaveChanges();
     }

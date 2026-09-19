@@ -68,7 +68,8 @@ public class MaterialListingService : IMaterialListingService
                 Type = (int)listing.Type,
                 Status = (int)listing.Status,
                 CreatedAt = listing.CreatedAt,
-                ImageUrl = listing.ImageUrl
+                ImageUrl = listing.ImageUrl,
+                SellerDeliveryAvailable = listing.SellerDeliveryAvailable
             })
             .ToListAsync();
 
@@ -106,7 +107,8 @@ public class MaterialListingService : IMaterialListingService
                 Type = (int)listing.Type,
                 Status = (int)listing.Status,
                 CreatedAt = listing.CreatedAt,
-                ImageUrl = listing.ImageUrl
+                ImageUrl = listing.ImageUrl,
+                SellerDeliveryAvailable = listing.SellerDeliveryAvailable
             })
             .FirstOrDefaultAsync();
     }
@@ -128,7 +130,8 @@ public class MaterialListingService : IMaterialListingService
             Type = (EcoLoop.Api.Models.ListingType)request.Type,
             Status = EcoLoop.Api.Models.ListingStatus.Active,
             CreatedAt = DateTime.UtcNow,
-            ImageUrl = request.ImageUrl
+            ImageUrl = request.ImageUrl,
+            SellerDeliveryAvailable = request.SellerDeliveryAvailable
         };
 
         _db.MaterialListings.Add(listing);
@@ -154,6 +157,7 @@ public class MaterialListingService : IMaterialListingService
         listing.Price = request.Price;
         listing.PriceUnit = request.PriceUnit;
         listing.DeliveryMethod = request.DeliveryMethod;
+        listing.SellerDeliveryAvailable = request.SellerDeliveryAvailable;
         listing.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();

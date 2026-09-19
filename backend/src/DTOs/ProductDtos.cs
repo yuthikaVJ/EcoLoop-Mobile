@@ -8,6 +8,7 @@ public class CreateProductRequest
     public string Description { get; set; } = string.Empty;
     public string MaterialType { get; set; } = string.Empty;
     public decimal Price { get; set; }
+    public bool SellerDeliveryAvailable { get; set; }
 }
 
 public class UpdateProductRequest
@@ -17,6 +18,7 @@ public class UpdateProductRequest
     public string Description { get; set; } = string.Empty;
     public string MaterialType { get; set; } = string.Empty;
     public decimal Price { get; set; }
+    public bool SellerDeliveryAvailable { get; set; }
 }
 
 public class ProductListDto
@@ -31,6 +33,7 @@ public class ProductListDto
     public bool SellerIsVerified { get; set; }
     public int AvailableQuantity { get; set; }
     public string? PrimaryImageUrl { get; set; }
+    public bool SellerDeliveryAvailable { get; set; }
 }
 
 public class ProductDetailsDto
@@ -45,4 +48,5 @@ public class ProductDetailsDto
     public bool SellerIsVerified { get; set; }
     public int AvailableQuantity { get; set; }
     public List<string> Images { get; set; } = [];
+    public bool SellerDeliveryAvailable { get; set; }
 }

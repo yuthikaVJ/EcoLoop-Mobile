@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../materials_marketplace/domain/entities/material_listing.dart';
 import '../../../materials_marketplace/presentation/pages/material_details_page.dart';
+import '../../../transactions_delivery/presentation/pages/transactions_hub_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -255,7 +256,9 @@ class HomePage extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: () {},
+          onTap: title == 'Track Order'
+              ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TransactionsHubPage()))
+              : null,
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(

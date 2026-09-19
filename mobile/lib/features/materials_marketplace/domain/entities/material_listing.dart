@@ -11,6 +11,9 @@ class MaterialListing {
   final String imageUrl;
   final bool isIHave; // true for 'I HAVE', false for 'I NEED'
   final DateTime datePosted;
+  final String businessId;
+  final String unit;
+  final bool sellerDeliveryAvailable;
 
   MaterialListing({
     required this.id,
@@ -25,6 +28,9 @@ class MaterialListing {
     required this.imageUrl,
     required this.isIHave,
     required this.datePosted,
+    this.businessId = '11111111-1111-1111-1111-111111111111',
+    this.unit = 'Tons',
+    this.sellerDeliveryAvailable = false,
   });
 }
 

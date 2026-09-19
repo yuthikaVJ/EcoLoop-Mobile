@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/material_listing.dart';
+import '../../../transactions_delivery/presentation/pages/confirm_material_transaction_page.dart';
 import 'chat_page.dart';
 
 class MaterialDetailsPage extends StatelessWidget {
@@ -139,7 +140,7 @@ class MaterialDetailsPage extends StatelessWidget {
                         const Divider(height: 24),
                         _buildSpecRow(Icons.location_on_outlined, 'Location', listing.location),
                         const Divider(height: 24),
-                        _buildSpecRow(Icons.local_shipping_outlined, 'Delivery', 'Seller Delivery / Self Pickup'),
+                        _buildSpecRow(Icons.local_shipping_outlined, 'Delivery', listing.sellerDeliveryAvailable ? 'Self Pickup / Seller Delivery' : 'Self Pickup'),
                         const Divider(height: 24),
                         _buildSpecRow(Icons.access_time_outlined, 'Date Posted', _formatDate(listing.datePosted)),
                       ],
@@ -192,18 +193,22 @@ class MaterialDetailsPage extends StatelessWidget {
             )
           ],
         ),
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.forestGreen,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-          ),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => ChatPage(listing: listing)),
-            );
-          },
-          child: const Text('Contact Seller', style: TextStyle(fontSize: 16, color: AppColors.white, fontWeight: FontWeight.bold)),
+        child: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatPage(listing: listing))),
+                child: const Text('Contact Seller'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ConfirmMaterialTransactionPage(listing: listing))),
+                child: const Text('Start Transaction'),
+              ),
+            ),
+          ],
         ),
       ),
     );

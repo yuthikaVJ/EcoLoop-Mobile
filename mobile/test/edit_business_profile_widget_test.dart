@@ -61,6 +61,13 @@ void main() {
   group('EditBusinessProfilePage Widget Tests', () {
     testWidgets('pre-populates form fields and shows Save button',
         (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1080, 4000);
+      tester.view.devicePixelRatio = 2.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
       await tester.pumpWidget(
         const MaterialApp(
           home: EditBusinessProfilePage(
@@ -108,5 +115,56 @@ void main() {
       // Verify error message is displayed
       expect(find.text('Business name is required'), findsOneWidget);
     });
+
+    testWidgets('validates phone number: rejects < 10, > 10, accepts exactly 10 numbers',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1080, 4000);
+      tester.view.devicePixelRatio = 2.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: EditBusinessProfilePage(
+            profile: testProfile,
+            currentUserId: '11111111-1111-1111-1111-111111111111',
+          ),
+        ),
+      );
+
+      final phoneField = find.widgetWithText(TextFormField, 'Contact Phone *');
+
+      // 1. Clear phone field
+      await tester.enterText(phoneField, '');
+      await tester.pump();
+      await tester.tap(find.text('Save'));
+      await tester.pump();
+      expect(find.text('Phone number is required'), findsOneWidget);
+
+      // 2. Enter less than 10 numbers (e.g. 7 digits)
+      await tester.enterText(phoneField, '0112345');
+      await tester.pump();
+      await tester.tap(find.text('Save'));
+      await tester.pump();
+      expect(find.text('Phone number must be exactly 10 digits'), findsOneWidget);
+
+      // 3. Enter more than 10 numbers (e.g. 11 digits)
+      await tester.enterText(phoneField, '01123456789');
+      await tester.pump();
+      await tester.tap(find.text('Save'));
+      await tester.pump();
+      expect(find.text('Phone number must be exactly 10 digits'), findsOneWidget);
+
+      // 4. Enter exactly 10 numbers (valid)
+      await tester.enterText(phoneField, '0112345678');
+      await tester.pump();
+      await tester.tap(find.text('Save'));
+      await tester.pump();
+      expect(find.text('Phone number must be exactly 10 digits'), findsNothing);
+      expect(find.text('Phone number is required'), findsNothing);
+    });
   });
 }
+

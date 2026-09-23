@@ -13,7 +13,7 @@ public class BusinessProfileService : IBusinessProfileService
     private readonly IWebHostEnvironment? _environment;
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".jpg", ".jpeg", ".png", ".webp"
+        ".jpg", ".jpeg", ".png"
     };
     private const long MaxFileSizeBytes = 5 * 1024 * 1024; // 5 MB
 
@@ -92,6 +92,39 @@ public class BusinessProfileService : IBusinessProfileService
         return business == null ? null : MapToDto(business);
     }
 
+    public async Task<List<BusinessProfileDto>> GetMyProfilesAsync(Guid? userId, string? email = null)
+    {
+        var query = _db.Businesses.AsNoTracking().AsQueryable();
+
+        var normalizedEmail = email?.Trim().ToLowerInvariant();
+        var hasEmail = !string.IsNullOrEmpty(normalizedEmail);
+        var hasUserId = userId.HasValue;
+
+        if (hasUserId && hasEmail)
+        {
+            var uid = userId!.Value;
+            query = query.Where(b => b.UserId == uid || b.Email.ToLower() == normalizedEmail);
+        }
+        else if (hasUserId)
+        {
+            var uid = userId!.Value;
+            query = query.Where(b => b.UserId == uid);
+        }
+        else if (hasEmail)
+        {
+            query = query.Where(b => b.Email.ToLower() == normalizedEmail);
+        }
+        else
+        {
+            return new List<BusinessProfileDto>();
+        }
+
+        return await query
+            .OrderByDescending(b => b.CreatedAt)
+            .Select(b => MapToDto(b))
+            .ToListAsync();
+    }
+
     public async Task<List<BusinessProfileDto>> GetAllAsync()
     {
         return await _db.Businesses
@@ -167,9 +200,9 @@ public class BusinessProfileService : IBusinessProfileService
             throw new ArgumentException($"Invalid file type '{ext}'. Allowed extensions are: {string.Join(", ", AllowedExtensions)}");
         }
 
-        if (fileStream.Length > MaxFileSizeBytes)
+        if (fileStream.Length >= MaxFileSizeBytes)
         {
-            throw new ArgumentException($"File size exceeds the maximum limit of {MaxFileSizeBytes / (1024 * 1024)} MB.");
+            throw new ArgumentException("File size must be less than 5 MB.");
         }
 
         var rootPath = _environment?.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
@@ -244,6 +277,63 @@ public class BusinessProfileService : IBusinessProfileService
         await _db.SaveChangesAsync();
 
         return MapToDto(business);
+    }
+
+    public async Task DeleteAsync(Guid id, Guid? userId = null)
+    {
+        var business = await _db.Businesses.FirstOrDefaultAsync(b => b.Id == id);
+        if (business == null)
+        {
+            throw new KeyNotFoundException($"Business profile with ID '{id}' was not found.");
+        }
+
+        AuthorizeOwner(business, userId);
+
+        var rootPath = _environment?.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+        DeleteLocalFileIfPresent(rootPath, business.LogoUrl);
+        DeleteLocalFileIfPresent(rootPath, business.CoverPhotoUrl);
+
+        _db.Businesses.Remove(business);
+        await _db.SaveChangesAsync();
+    }
+
+    public async Task<List<BusinessPostDto>> GetPostsByBusinessIdAsync(Guid businessId)
+    {
+        var business = await _db.Businesses.AsNoTracking().FirstOrDefaultAsync(b => b.Id == businessId);
+        if (business == null)
+        {
+            return new List<BusinessPostDto>();
+        }
+
+        var list = new List<BusinessPostDto>();
+        var nameLower = business.BusinessName.ToLowerInvariant();
+        if (nameLower.Contains("greencycle") || nameLower.Contains("eco") || nameLower.Contains("recycle"))
+        {
+            list.Add(new BusinessPostDto
+            {
+                Id = Guid.NewGuid(),
+                BusinessProfileId = businessId,
+                Title = "I HAVE 500kg PET bottles",
+                Content = "Clean, baled post-consumer PET bottles ready for pickup or delivery.",
+                Type = "I HAVE",
+                MaterialCategory = "Plastics",
+                Quantity = "500kg",
+                CreatedAt = DateTime.UtcNow.AddDays(-2)
+            });
+            list.Add(new BusinessPostDto
+            {
+                Id = Guid.NewGuid(),
+                BusinessProfileId = businessId,
+                Title = "I NEED cardboard materials",
+                Content = "Looking for bulk corrugated cardboard bales for packaging reuse.",
+                Type = "I NEED",
+                MaterialCategory = "Paper & Cardboard",
+                Quantity = "1 Ton",
+                CreatedAt = DateTime.UtcNow.AddDays(-5)
+            });
+        }
+
+        return list;
     }
 
     private static void AuthorizeOwner(Business business, Guid? userId)

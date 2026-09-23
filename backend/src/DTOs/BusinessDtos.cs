@@ -28,8 +28,7 @@ public class CreateBusinessProfileRequest
     public string Email { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Phone number is required.")]
-    [Phone(ErrorMessage = "A valid phone number is required.")]
-    [StringLength(30, ErrorMessage = "Phone number must not exceed 30 characters.")]
+    [RegularExpression(@"^\d{10}$", ErrorMessage = "Phone number must be exactly 10 digits.")]
     public string Phone { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Address is required.")]
@@ -70,8 +69,7 @@ public class UpdateBusinessProfileRequest
     public string Email { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Phone number is required.")]
-    [Phone(ErrorMessage = "A valid phone number is required.")]
-    [StringLength(30, ErrorMessage = "Phone number must not exceed 30 characters.")]
+    [RegularExpression(@"^\d{10}$", ErrorMessage = "Phone number must be exactly 10 digits.")]
     public string Phone { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Address is required.")]
@@ -107,4 +105,16 @@ public class BusinessProfileDto
     public Guid? UserId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+}
+
+public class BusinessPostDto
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid BusinessProfileId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string? Content { get; set; }
+    public string Type { get; set; } = "I HAVE"; // "I HAVE" or "I NEED"
+    public string? MaterialCategory { get; set; }
+    public string? Quantity { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

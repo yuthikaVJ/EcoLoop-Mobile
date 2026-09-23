@@ -1,9 +1,10 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/image_validator.dart';
 import '../../data/business_repository.dart';
 import '../../domain/entities/business_profile.dart';
 
@@ -98,11 +99,16 @@ class _EditBusinessProfilePageState extends State<EditBusinessProfilePage> {
 
       final bytes = await picked.readAsBytes();
 
-      if (bytes.length > 5 * 1024 * 1024) {
+      final validation = ImageValidator.validateImage(
+        fileName: picked.name,
+        byteLength: bytes.length,
+      );
+
+      if (!validation.isValid) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Image must be smaller than 5 MB.'),
+          SnackBar(
+            content: Text(validation.errorMessage!),
             backgroundColor: AppColors.errorRed,
           ),
         );
@@ -560,7 +566,7 @@ class _EditBusinessProfilePageState extends State<EditBusinessProfilePage> {
                             ),
                             const SizedBox(height: 4),
                             const Text(
-                              'JPG, PNG or WebP. Max 5 MB.',
+                              'JPG or PNG. Less than 5 MB.',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppColors.slateGray,
@@ -724,16 +730,24 @@ class _EditBusinessProfilePageState extends State<EditBusinessProfilePage> {
                   TextFormField(
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
                     decoration: const InputDecoration(
                       labelText: 'Contact Phone *',
+                      hintText: '0712345678',
                       prefixIcon: Icon(Icons.phone_outlined),
                     ),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
                         return 'Phone number is required';
                       }
-                      if (value.trim().length < 7) {
-                        return 'Enter a valid phone number';
+                      final phone = value.trim();
+                      if (!RegExp(r'^\d+$').hasMatch(phone)) {
+                        return 'Phone number must contain only numbers';
+                      }
+                      if (phone.length != 10) {
+                        return 'Phone number must be exactly 10 digits';
                       }
                       return null;
                     },

@@ -3,20 +3,26 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/image_validator.dart';
+import '../../data/business_profile_session.dart';
 import '../../data/business_repository.dart';
+import '../../domain/entities/business_post.dart';
 import '../../domain/entities/business_profile.dart';
+import '../widgets/business_profile_selection_dialog.dart';
 import 'edit_business_profile_page.dart';
 
 class BusinessProfileDetailsPage extends StatefulWidget {
   final BusinessProfile profile;
   final bool isNewlyCreated;
   final String? currentUserId;
+  final bool isActiveSession;
 
   const BusinessProfileDetailsPage({
     super.key,
     required this.profile,
     this.isNewlyCreated = false,
     this.currentUserId,
+    this.isActiveSession = false,
   });
 
   @override
@@ -31,11 +37,45 @@ class _BusinessProfileDetailsPageState
   final _imagePicker = ImagePicker();
 
   bool _isUploading = false;
+  List<BusinessPost> _posts = [];
+  bool _isLoadingPosts = true;
+
+  bool get _isActive {
+    if (widget.isActiveSession) return true;
+    final activeId = BusinessProfileSession().currentProfile?.id;
+    return activeId != null && activeId == _profile.id;
+  }
 
   @override
   void initState() {
     super.initState();
     _profile = widget.profile;
+    _loadPosts();
+  }
+
+  Future<void> _loadPosts() async {
+    setState(() {
+      _isLoadingPosts = true;
+    });
+
+    try {
+      final posts = await _repository.getBusinessPosts(
+        _profile.id,
+        businessName: _profile.businessName,
+      );
+      if (mounted) {
+        setState(() {
+          _posts = posts;
+          _isLoadingPosts = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoadingPosts = false;
+        });
+      }
+    }
   }
 
   bool get _isOwner {
@@ -57,7 +97,179 @@ class _BusinessProfileDetailsPageState
       setState(() {
         _profile = updated;
       });
+      if (_isActive) {
+        await BusinessProfileSession().setActiveProfile(updated);
+      }
     }
+  }
+
+  Future<void> _switchBusinessProfile() async {
+    final selected = await BusinessProfileSelectionDialog.show(
+      context,
+      currentUserId: widget.currentUserId,
+      currentUserEmail: _profile.email,
+    );
+
+    if (selected != null && mounted) {
+      setState(() {
+        _profile = selected;
+      });
+      _loadPosts();
+    }
+  }
+
+  Future<void> _signOutBusinessProfile() async {
+    await BusinessProfileSession().clearActiveProfile();
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Signed out of ${_profile.businessName}'),
+        backgroundColor: AppColors.slateGray,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  Future<void> _deleteBusinessProfile() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppColors.errorRed, size: 24),
+            SizedBox(width: 8),
+            Text('Delete Business Profile'),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to delete "${_profile.businessName}"? This will permanently delete/deactivate your business profile from EcoLoop. Only the owner can perform this action.',
+          style: const TextStyle(fontSize: 14, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.errorRed,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete Profile'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      final effectiveUserId = widget.currentUserId ?? _profile.userId;
+      await _repository.deleteBusinessProfile(_profile.id, userId: effectiveUserId);
+      await BusinessProfileSession().clearActiveProfile();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Business profile "${_profile.businessName}" has been deleted.'),
+          backgroundColor: AppColors.forestGreen,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Delete failed: ${e.message}'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error deleting profile: $e'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+    }
+  }
+
+  void _handleMenuOption(String option) {
+    switch (option) {
+      case 'edit':
+        _openEditProfile();
+        break;
+      case 'switch':
+        _switchBusinessProfile();
+        break;
+      case 'signout':
+        _signOutBusinessProfile();
+        break;
+      case 'delete':
+        _deleteBusinessProfile();
+        break;
+    }
+  }
+
+  List<PopupMenuEntry<String>> _buildMenuItems() {
+    return [
+      if (_isOwner)
+        const PopupMenuItem<String>(
+          value: 'edit',
+          child: Row(
+            children: [
+              Icon(Icons.edit_outlined, size: 20, color: AppColors.darkCharcoal),
+              SizedBox(width: 12),
+              Text('Edit Profile'),
+            ],
+          ),
+        ),
+      const PopupMenuItem<String>(
+        value: 'switch',
+        child: Row(
+          children: [
+            Icon(Icons.swap_horiz, size: 20, color: AppColors.darkCharcoal),
+            SizedBox(width: 12),
+            Text('Switch Business Profile'),
+          ],
+        ),
+      ),
+      const PopupMenuItem<String>(
+        value: 'signout',
+        child: Row(
+          children: [
+            Icon(Icons.logout, size: 20, color: AppColors.darkCharcoal),
+            SizedBox(width: 12),
+            Text('Sign Out of Business Profile'),
+          ],
+        ),
+      ),
+      if (_isOwner) ...[
+        const PopupMenuDivider(),
+        const PopupMenuItem<String>(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(Icons.delete_outline, size: 20, color: AppColors.errorRed),
+              SizedBox(width: 12),
+              Text('Delete Business Profile', style: TextStyle(color: AppColors.errorRed)),
+            ],
+          ),
+        ),
+      ],
+    ];
   }
 
   Future<void> _pickAndUploadPhoto(String imageType) async {
@@ -73,11 +285,16 @@ class _BusinessProfileDetailsPageState
 
       final bytes = await picked.readAsBytes();
 
-      if (bytes.length > 5 * 1024 * 1024) {
+      final validation = ImageValidator.validateImage(
+        fileName: picked.name,
+        byteLength: bytes.length,
+      );
+
+      if (!validation.isValid) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Image must be smaller than 5 MB.'),
+          SnackBar(
+            content: Text(validation.errorMessage!),
             backgroundColor: AppColors.errorRed,
           ),
         );
@@ -320,6 +537,12 @@ class _BusinessProfileDetailsPageState
               tooltip: 'Edit Profile',
               onPressed: _openEditProfile,
             ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: 'Manage Business Profile',
+            onSelected: _handleMenuOption,
+            itemBuilder: (context) => _buildMenuItems(),
+          ),
         ],
       ),
       body: Center(
@@ -335,10 +558,12 @@ class _BusinessProfileDetailsPageState
                   });
                 }
               } catch (_) {}
+              await _loadPosts();
             },
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
+                if (_isActive) _buildActiveSessionBanner(),
                 if (widget.isNewlyCreated) ...[
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -719,6 +944,7 @@ class _BusinessProfileDetailsPageState
                           ),
                         ),
                       ),
+                      _buildPostsSection(),
                     ],
                   ),
                 ),
@@ -917,6 +1143,278 @@ class _BusinessProfileDetailsPageState
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildActiveSessionBanner() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.forestGreen,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.forestGreen.withOpacity(0.25),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: const BoxDecoration(
+              color: Color(0xFF00E676),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'ACTIVE BUSINESS PROFILE',
+                  style: TextStyle(
+                    color: Color(0xFFB9F6CA),
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Acting as ${_profile.businessName}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.white, size: 20),
+            tooltip: 'Business Options',
+            onSelected: _handleMenuOption,
+            itemBuilder: (context) => _buildMenuItems(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPostsSection() {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 24),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.dynamic_feed_outlined,
+                  size: 20,
+                  color: AppColors.forestGreen,
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Posts',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.darkCharcoal,
+                  ),
+                ),
+                const Spacer(),
+                if (_posts.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.mintGreen,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${_posts.length}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.forestGreen,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            if (_isLoadingPosts)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_posts.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.article_outlined,
+                        size: 36,
+                        color: AppColors.slateGray.withOpacity(0.5),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'No posts yet.',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.darkCharcoal,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'This business has not shared any marketplace material posts yet.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.slateGray,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _posts.length,
+                separatorBuilder: (_, __) => const Divider(height: 16),
+                itemBuilder: (context, index) {
+                  final post = _posts[index];
+                  final isIHave = post.type.toUpperCase() == 'I HAVE';
+
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.offWhite,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.mintGreen.withOpacity(0.6)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isIHave
+                                    ? AppColors.mintGreen
+                                    : const Color(0xFFE3F2FD),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                post.type,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: isIHave
+                                      ? AppColors.forestGreen
+                                      : const Color(0xFF1565C0),
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              post.timeAgo,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.slateGray,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          post.title,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.darkCharcoal,
+                          ),
+                        ),
+                        if (post.content != null && post.content!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            post.content!,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.slateGray,
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                        if (post.quantity != null || post.materialCategory != null) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              if (post.quantity != null) ...[
+                                const Icon(
+                                  Icons.scale_outlined,
+                                  size: 14,
+                                  color: AppColors.forestGreen,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  post.quantity!,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.darkCharcoal,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                              ],
+                              if (post.materialCategory != null) ...[
+                                const Icon(
+                                  Icons.category_outlined,
+                                  size: 14,
+                                  color: AppColors.forestGreen,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  post.materialCategory!,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.slateGray,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

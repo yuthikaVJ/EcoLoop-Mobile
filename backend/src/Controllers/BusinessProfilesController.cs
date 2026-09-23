@@ -59,6 +59,18 @@ public class BusinessProfilesController : ControllerBase
             : Ok(profile);
     }
 
+    [HttpGet("my")]
+    public async Task<IActionResult> GetMyProfiles([FromQuery] string? email)
+    {
+        var userId = GetRequestUserId();
+        var effectiveEmail = !string.IsNullOrWhiteSpace(email)
+            ? email
+            : (Request.Headers.TryGetValue("X-User-Email", out var emailHeader) ? emailHeader.ToString() : null);
+
+        var profiles = await _service.GetMyProfilesAsync(userId, effectiveEmail);
+        return Ok(profiles);
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -178,6 +190,33 @@ public class BusinessProfilesController : ControllerBase
         {
             return BadRequest(new { message = ex.Message });
         }
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> DeleteProfile(Guid id)
+    {
+        var userId = GetRequestUserId();
+
+        try
+        {
+            await _service.DeleteAsync(id, userId);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("{id:guid}/posts")]
+    public async Task<IActionResult> GetProfilePosts(Guid id)
+    {
+        var posts = await _service.GetPostsByBusinessIdAsync(id);
+        return Ok(posts);
     }
 
     private Guid? GetRequestUserId()

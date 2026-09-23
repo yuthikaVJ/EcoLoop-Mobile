@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/image_validator.dart';
 import '../../data/business_repository.dart';
 import 'business_profile_details_page.dart';
-
 
 class CreateBusinessProfilePage extends StatefulWidget {
   final String? currentUserId;
@@ -22,6 +24,7 @@ class CreateBusinessProfilePage extends StatefulWidget {
 class _CreateBusinessProfilePageState extends State<CreateBusinessProfilePage> {
   final _formKey = GlobalKey<FormState>();
   final _businessRepository = BusinessRepository();
+  final _imagePicker = ImagePicker();
 
   // Controllers
   final _nameController = TextEditingController();
@@ -32,6 +35,12 @@ class _CreateBusinessProfilePageState extends State<CreateBusinessProfilePage> {
   final _descriptionController = TextEditingController();
   final _websiteController = TextEditingController();
   final _logoUrlController = TextEditingController();
+
+  // Selected Images (Optional)
+  Uint8List? _profileImageBytes;
+  String? _profileImageName;
+  Uint8List? _coverImageBytes;
+  String? _coverImageName;
 
   final List<String> _businessTypes = [
     'Recycling Company',
@@ -50,10 +59,18 @@ class _CreateBusinessProfilePageState extends State<CreateBusinessProfilePage> {
   void initState() {
     super.initState();
     _selectedBusinessType = _businessTypes.first;
+    _nameController.addListener(_onNameChanged);
+  }
+
+  void _onNameChanged() {
+    if (mounted && _profileImageBytes == null) {
+      setState(() {});
+    }
   }
 
   @override
   void dispose() {
+    _nameController.removeListener(_onNameChanged);
     _nameController.dispose();
     _regNumberController.dispose();
     _emailController.dispose();
@@ -63,6 +80,68 @@ class _CreateBusinessProfilePageState extends State<CreateBusinessProfilePage> {
     _websiteController.dispose();
     _logoUrlController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage(String imageType) async {
+    try {
+      final picked = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+
+      if (picked == null) return;
+
+      final bytes = await picked.readAsBytes();
+
+      // Validate format and size
+      final validation = ImageValidator.validateImage(
+        fileName: picked.name,
+        byteLength: bytes.length,
+      );
+
+      if (!validation.isValid) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(validation.errorMessage!),
+            backgroundColor: AppColors.errorRed,
+          ),
+        );
+        return;
+      }
+
+      setState(() {
+        if (imageType == 'cover') {
+          _coverImageBytes = bytes;
+          _coverImageName = picked.name;
+        } else {
+          _profileImageBytes = bytes;
+          _profileImageName = picked.name;
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error selecting image: $e'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+    }
+  }
+
+  void _removeImage(String imageType) {
+    setState(() {
+      if (imageType == 'cover') {
+        _coverImageBytes = null;
+        _coverImageName = null;
+      } else {
+        _profileImageBytes = null;
+        _profileImageName = null;
+      }
+    });
   }
 
   Future<void> _submitForm() async {
@@ -95,10 +174,42 @@ class _CreateBusinessProfilePageState extends State<CreateBusinessProfilePage> {
         if (widget.currentUserId != null) 'userId': widget.currentUserId,
       };
 
-      final createdProfile = await _businessRepository.createBusinessProfile(
+      var createdProfile = await _businessRepository.createBusinessProfile(
         payload,
         userId: widget.currentUserId,
       );
+
+      final effectiveUserId = widget.currentUserId ?? createdProfile.userId;
+
+      // Upload profile image if user chose one
+      if (_profileImageBytes != null) {
+        try {
+          createdProfile = await _businessRepository.uploadBusinessImage(
+            createdProfile.id,
+            _profileImageBytes!,
+            _profileImageName ?? 'profile.png',
+            'profile',
+            userId: effectiveUserId,
+          );
+        } catch (e) {
+          debugPrint('Profile image upload failed: $e');
+        }
+      }
+
+      // Upload cover photo if user chose one
+      if (_coverImageBytes != null) {
+        try {
+          createdProfile = await _businessRepository.uploadBusinessImage(
+            createdProfile.id,
+            _coverImageBytes!,
+            _coverImageName ?? 'cover.png',
+            'cover',
+            userId: effectiveUserId,
+          );
+        } catch (e) {
+          debugPrint('Cover photo upload failed: $e');
+        }
+      }
 
       if (!mounted) return;
       await Navigator.of(context).pushReplacement(
@@ -132,7 +243,6 @@ class _CreateBusinessProfilePageState extends State<CreateBusinessProfilePage> {
         ),
       );
     } finally {
-
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -228,6 +338,214 @@ class _CreateBusinessProfilePageState extends State<CreateBusinessProfilePage> {
                   ),
                 ),
               ],
+
+              // Section: Profile Media (Optional)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Profile Media',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.darkCharcoal,
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.mintGreen.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'Optional',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.forestGreen,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Cover Image Preview & Controls
+              Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  Container(
+                    height: 160,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: AppColors.mintGreen,
+                      image: _coverImageBytes != null
+                          ? DecorationImage(
+                              image: MemoryImage(_coverImageBytes!),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
+                    ),
+                    child: _coverImageBytes == null
+                        ? const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.panorama_outlined,
+                                  size: 40,
+                                  color: AppColors.forestGreen,
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  'Add Cover Photo (Optional)',
+                                  style: TextStyle(
+                                    color: AppColors.forestGreen,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'PNG or JPEG, less than 5 MB',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.slateGray,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : null,
+                  ),
+                  Positioned(
+                    right: 8,
+                    bottom: 8,
+                    child: Row(
+                      children: [
+                        if (_coverImageBytes != null)
+                          IconButton.filled(
+                            key: const ValueKey('remove_cover_button'),
+                            style: IconButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: AppColors.errorRed,
+                            ),
+                            icon: const Icon(Icons.delete_outline, size: 20),
+                            tooltip: 'Remove Cover',
+                            onPressed: _isLoading ? null : () => _removeImage('cover'),
+                          ),
+                        if (_coverImageBytes != null)
+                          const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          key: const ValueKey('pick_cover_button'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: AppColors.darkCharcoal,
+                            elevation: 3,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                          ),
+                          onPressed: _isLoading ? null : () => _pickImage('cover'),
+                          icon: const Icon(Icons.camera_alt, size: 18),
+                          label: Text(
+                            _coverImageBytes != null
+                                ? 'Change Cover'
+                                : 'Add Cover',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Profile Picture Preview & Controls
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 40,
+                    backgroundColor: AppColors.mintGreen,
+                    backgroundImage: _profileImageBytes != null
+                        ? MemoryImage(_profileImageBytes!)
+                        : null,
+                    child: _profileImageBytes == null
+                        ? Text(
+                            _nameController.text.trim().isNotEmpty
+                                ? _nameController.text.trim()[0].toUpperCase()
+                                : 'B',
+                            style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.forestGreen,
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Profile Picture',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: AppColors.darkCharcoal,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'PNG or JPEG. Less than 5 MB.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.slateGray,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            OutlinedButton.icon(
+                              key: const ValueKey('pick_profile_button'),
+                              onPressed: _isLoading
+                                  ? null
+                                  : () => _pickImage('profile'),
+                              icon: const Icon(Icons.upload, size: 16),
+                              label: Text(
+                                _profileImageBytes != null
+                                    ? 'Change'
+                                    : 'Upload',
+                              ),
+                            ),
+                            if (_profileImageBytes != null)
+                              TextButton.icon(
+                                key: const ValueKey('remove_profile_button'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppColors.errorRed,
+                                ),
+                                onPressed: _isLoading
+                                    ? null
+                                    : () => _removeImage('profile'),
+                                icon: const Icon(Icons.delete_outline,
+                                    size: 16),
+                                label: const Text('Remove'),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 16),
 
               // Section 1: Business Identity
               const Text(
@@ -344,17 +662,24 @@ class _CreateBusinessProfilePageState extends State<CreateBusinessProfilePage> {
               TextFormField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
                 decoration: const InputDecoration(
                   labelText: 'Contact Phone *',
-                  hintText: '+94 11 234 5678',
+                  hintText: '0712345678',
                   prefixIcon: Icon(Icons.phone_outlined),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'Phone number is required';
                   }
-                  if (value.trim().length < 7) {
-                    return 'Enter a valid phone number';
+                  final phone = value.trim();
+                  if (!RegExp(r'^\d+$').hasMatch(phone)) {
+                    return 'Phone number must contain only numbers';
+                  }
+                  if (phone.length != 10) {
+                    return 'Phone number must be exactly 10 digits';
                   }
                   return null;
                 },

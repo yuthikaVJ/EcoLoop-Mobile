@@ -23,6 +23,7 @@ public class EcoLoopDbContext : DbContext
     public DbSet<ProductOrderItem> ProductOrderItems => Set<ProductOrderItem>();
     public DbSet<ProductOrderStatusHistory> ProductOrderStatusHistories => Set<ProductOrderStatusHistory>();
     public DbSet<Delivery> Deliveries => Set<Delivery>();
+    public DbSet<DeliveryLocation> DeliveryLocations => Set<DeliveryLocation>();
 
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)
@@ -91,6 +92,15 @@ public class EcoLoopDbContext : DbContext
         ConfigureMaterialTransactions(modelBuilder);
         ConfigureProductOrders(modelBuilder);
         ConfigureDeliveries(modelBuilder);
+        modelBuilder.Entity<DeliveryLocation>(entity =>
+        {
+            entity.Property(x => x.Label).HasMaxLength(80);
+            entity.Property(x => x.Address).HasMaxLength(500);
+            entity.HasOne(x => x.Business).WithMany().HasForeignKey(x => x.BusinessId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.BusinessId, x.Label });
+            entity.ToTable(t => t.HasCheckConstraint("CK_DeliveryLocations_Coordinates",
+                "(\"Latitude\" IS NULL AND \"Longitude\" IS NULL) OR (\"Latitude\" IS NOT NULL AND \"Longitude\" IS NOT NULL AND \"Latitude\" BETWEEN -90 AND 90 AND \"Longitude\" BETWEEN -180 AND 180)"));
+        });
     }
 
     private static void ConfigureMaterialTransactions(ModelBuilder modelBuilder)

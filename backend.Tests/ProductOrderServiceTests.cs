@@ -75,6 +75,11 @@ public class ProductOrderServiceTests
         var created = await service.CreateAsync(Request(context, product, 1, DeliveryMethod.SelfPickup));
         await service.ChangeStatusAsync(created.Data!.Id, context.Seller.Id, ProductOrderStatus.Confirmed, null);
         await service.ChangeStatusAsync(created.Data.Id, context.Seller.Id, ProductOrderStatus.Processing, null);
+        var processing = await service.GetByIdAsync(created.Data.Id);
+        await service.UpdateLocationAsync(created.Data.Id, new UpdateDeliveryLocationRequest
+        {
+            ActingBusinessId = context.Seller.Id, Location = "Seller collection point", ExpectedUpdatedAt = processing!.UpdatedAt
+        });
         await service.ChangeStatusAsync(created.Data.Id, context.Seller.Id, ProductOrderStatus.Ready, null);
 
         var result = await service.ChangeStatusAsync(created.Data.Id, context.Seller.Id, ProductOrderStatus.Delivered, null);

@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace EcoLoop.Api.Models;
 
 public class MaterialTransaction
@@ -10,8 +12,10 @@ public class MaterialTransaction
     public string Unit { get; set; } = string.Empty;
     public decimal UnitPrice { get; set; }
     public decimal TotalAmount { get; set; }
+    [ConcurrencyCheck]
     public MaterialTransactionStatus Status { get; set; } = MaterialTransactionStatus.Pending;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    [ConcurrencyCheck]
     public DateTime? UpdatedAt { get; set; }
 
     public MaterialListing? MaterialListing { get; set; }

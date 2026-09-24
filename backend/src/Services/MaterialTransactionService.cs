@@ -14,6 +14,9 @@ public class MaterialTransactionService : IMaterialTransactionService
 
     public async Task<(MaterialTransactionDetailsDto? Data, string? Error)> CreateAsync(CreateMaterialTransactionRequest request)
     {
+        var validation = TransactionRules.ValidateTerms(request.Quantity, request.Unit, request.UnitPrice)
+            ?? TransactionRules.ValidateDelivery(request.Delivery);
+        if (validation != null) return (null, validation);
         if (request.Quantity <= 0) return (null, "Quantity must be greater than zero.");
         if (request.UnitPrice < 0) return (null, "Unit price cannot be negative.");
         if (string.IsNullOrWhiteSpace(request.Unit)) return (null, "Unit is required.");
@@ -53,7 +56,8 @@ public class MaterialTransactionService : IMaterialTransactionService
             Delivery = new Delivery
             {
                 Method = method,
-                Location = CleanLocation(request.Delivery.Location),
+                Location = method == DeliveryMethod.SelfPickup && listing.Type == ListingType.IHave
+                    ? CleanLocation(listing.Location) : CleanLocation(request.Delivery.Location),
                 CreatedAt = now
             },
             StatusHistory =
@@ -88,7 +92,8 @@ public class MaterialTransactionService : IMaterialTransactionService
     public async Task<(MaterialTransactionDetailsDto? Data, string? Error)> ChangeStatusAsync(
         Guid id, Guid actingBusinessId, MaterialTransactionStatus status, string? note)
     {
-        var item = await _db.MaterialTransactions.FirstOrDefaultAsync(x => x.Id == id);
+        if (note?.Length > 500) return (null, "Note must not exceed 500 characters.");
+        var item = await _db.MaterialTransactions.Include(x => x.Delivery).FirstOrDefaultAsync(x => x.Id == id);
         if (item == null) return (null, "Material transaction was not found.");
         if (item.Status is MaterialTransactionStatus.Rejected or MaterialTransactionStatus.Completed or MaterialTransactionStatus.Cancelled)
             return (null, "A terminal transaction cannot be changed.");
@@ -101,6 +106,8 @@ public class MaterialTransactionService : IMaterialTransactionService
             return (null, "Only the seller can perform this action.");
         if (!IsValidTransition(item.Status, status))
             return (null, $"Cannot change transaction from {item.Status} to {status}.");
+        if (status == MaterialTransactionStatus.Ready && string.IsNullOrWhiteSpace(item.Delivery?.Location))
+            return (null, "Set the pickup/delivery address before marking this transaction ready.");
 
         var now = DateTime.UtcNow;
         item.Status = status;
@@ -117,11 +124,71 @@ public class MaterialTransactionService : IMaterialTransactionService
         return (await GetByIdAsync(id), null);
     }
 
+    public async Task<MaterialTransactionDetailsDto> UpdateDetailsAsync(Guid id, UpdateMaterialTransactionRequest request)
+    {
+        var item = await _db.MaterialTransactions.SingleOrDefaultAsync(x => x.Id == id)
+            ?? throw new TransactionRuleException(404, "Material transaction not found.");
+        if (request.ActingBusinessId != item.BuyerBusinessId)
+            throw new TransactionRuleException(403, "Only the buyer can revise a request.");
+        if (item.Status != MaterialTransactionStatus.Pending)
+            throw new TransactionRuleException(409, "Only pending requests can be revised.");
+        if (item.UpdatedAt != request.ExpectedUpdatedAt)
+            throw new TransactionRuleException(409, "The request changed. Reload it before editing.");
+        var error = TransactionRules.ValidateTerms(request.Quantity, request.Unit, request.UnitPrice);
+        if (error != null) throw new TransactionRuleException(400, error);
+        var oldTerms = $"{item.Quantity} {item.Unit} at {item.UnitPrice}";
+        item.Quantity = request.Quantity;
+        item.Unit = request.Unit.Trim();
+        item.UnitPrice = request.UnitPrice;
+        item.TotalAmount = decimal.Round(item.Quantity * item.UnitPrice, 2);
+        item.UpdatedAt = DateTime.UtcNow;
+        _db.MaterialTransactionStatusHistories.Add(new()
+        {
+            MaterialTransactionId = id, Status = item.Status, ChangedByBusinessId = request.ActingBusinessId,
+            Note = $"Request revised from {oldTerms} to {item.Quantity} {item.Unit} at {item.UnitPrice}; awaiting seller acceptance.",
+            CreatedAt = item.UpdatedAt.Value
+        });
+        await _db.SaveChangesAsync();
+        return (await GetByIdAsync(id))!;
+    }
+
+    public async Task<MaterialTransactionDetailsDto> UpdateLocationAsync(Guid id, UpdateDeliveryLocationRequest request)
+    {
+        var item = await _db.MaterialTransactions.Include(x => x.Delivery).SingleOrDefaultAsync(x => x.Id == id)
+            ?? throw new TransactionRuleException(404, "Material transaction not found.");
+        if (item.Delivery == null) throw new TransactionRuleException(404, "Delivery not found.");
+        ValidateLocationEdit(request, item.Delivery, item.BuyerBusinessId, item.SellerBusinessId,
+            item.Status is MaterialTransactionStatus.Pending or MaterialTransactionStatus.Accepted or MaterialTransactionStatus.Processing,
+            item.UpdatedAt);
+        item.Delivery.Location = request.Location.Trim();
+        item.UpdatedAt = item.Delivery.UpdatedAt = DateTime.UtcNow;
+        _db.MaterialTransactionStatusHistories.Add(new()
+        {
+            MaterialTransactionId = id, Status = item.Status, ChangedByBusinessId = request.ActingBusinessId,
+            Note = "Pickup/delivery location updated.", CreatedAt = item.UpdatedAt.Value
+        });
+        await _db.SaveChangesAsync();
+        return (await GetByIdAsync(id))!;
+    }
+
+    internal static void ValidateLocationEdit(UpdateDeliveryLocationRequest request, Delivery delivery,
+        Guid buyer, Guid seller, bool editable, DateTime? updatedAt)
+    {
+        var owner = delivery.Method == DeliveryMethod.SelfPickup ? seller : buyer;
+        if (request.ActingBusinessId != owner)
+            throw new TransactionRuleException(403, "Only the seller can change pickup addresses; only the buyer can change delivery destinations.");
+        if (!editable) throw new TransactionRuleException(409, "Location cannot change once ready or terminal.");
+        if (updatedAt != request.ExpectedUpdatedAt)
+            throw new TransactionRuleException(409, "This record changed. Reload it before editing.");
+        if (string.IsNullOrWhiteSpace(request.Location) || request.Location.Length > 500)
+            throw new TransactionRuleException(400, "Location must contain 1 to 500 characters.");
+    }
+
     private async Task<object> GetHistoryAsync(
         System.Linq.Expressions.Expression<Func<MaterialTransaction, bool>> predicate,
         int page, int pageSize)
     {
-        page = Math.Max(page, 1);
+        page = Math.Clamp(page, 1, 1000000);
         pageSize = Math.Clamp(pageSize, 1, 100);
         var query = BaseQuery().AsNoTracking().Where(predicate).OrderByDescending(x => x.CreatedAt);
         var totalItems = await query.CountAsync();

@@ -51,6 +51,10 @@ public class ProductOrdersController : ControllerBase
         return item == null ? NotFound() : Ok(item.Delivery);
     }
 
+    [HttpPut("{id:guid}/delivery")]
+    public async Task<IActionResult> UpdateLocation(Guid id, UpdateDeliveryLocationRequest request) =>
+        Ok(await _service.UpdateLocationAsync(id, request));
+
     [HttpPost("{id:guid}/confirm")]
     public Task<IActionResult> Confirm(Guid id, TransactionActionRequest request) => Change(id, request, ProductOrderStatus.Confirmed);
 
@@ -71,6 +75,8 @@ public class ProductOrdersController : ControllerBase
 
     private async Task<IActionResult> Change(Guid id, TransactionActionRequest request, ProductOrderStatus status)
     {
+        if (request.Note?.Length > 500) return BadRequest(new { message = "Note must not exceed 500 characters." });
+        if (await _service.GetByIdAsync(id) == null) return NotFound(new { message = "Record not found." });
         var result = await _service.ChangeStatusAsync(id, request.ActingBusinessId, status, request.Note);
         return result.Data == null ? BadRequest(new { message = result.Error }) : Ok(result.Data);
     }

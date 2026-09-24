@@ -5,6 +5,8 @@ namespace EcoLoop.Api.Services.Interfaces;
 
 public interface IMaterialTransactionService
 {
+    Task<MaterialTransactionDetailsDto> UpdateDetailsAsync(Guid id, UpdateMaterialTransactionRequest request);
+    Task<MaterialTransactionDetailsDto> UpdateLocationAsync(Guid id, UpdateDeliveryLocationRequest request);
     Task<(MaterialTransactionDetailsDto? Data, string? Error)> CreateAsync(CreateMaterialTransactionRequest request);
     Task<MaterialTransactionDetailsDto?> GetByIdAsync(Guid id);
     Task<object> GetBuyerHistoryAsync(Guid buyerBusinessId, int page, int pageSize);

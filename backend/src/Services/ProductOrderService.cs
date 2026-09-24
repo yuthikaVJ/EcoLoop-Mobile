@@ -15,9 +15,13 @@ public class ProductOrderService : IProductOrderService
 
     public async Task<(ProductOrderDetailsDto? Data, string? Error)> CreateAsync(CreateProductOrderRequest request)
     {
-        if (request.Items.Count == 0) return (null, "At least one order item is required.");
-        if (request.Items.Any(x => x.Quantity <= 0)) return (null, "Every item quantity must be greater than zero.");
+        var deliveryError = TransactionRules.ValidateDelivery(request.Delivery);
+        if (deliveryError != null) return (null, deliveryError);
+        if (request.Items == null || request.Items.Count == 0) return (null, "At least one order item is required.");
+        if (request.Items.Any(x => x == null || x.Quantity <= 0)) return (null, "Every item quantity must be greater than zero.");
         if (!Enum.IsDefined(typeof(DeliveryMethod), request.Delivery.Method)) return (null, "Invalid delivery method.");
+        if (request.Items.Count > 100 || request.Items.Sum(x => (long)x.Quantity) > int.MaxValue)
+            return (null, "Order contains too many items or units.");
         await using var dbTransaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         if (!await _db.Businesses.AnyAsync(x => x.Id == request.BuyerBusinessId)) return (null, "Buyer business was not found.");
 
@@ -42,6 +46,9 @@ public class ProductOrderService : IProductOrderService
                 return (null, $"Insufficient inventory for {product.Name}.");
         }
 
+        if (products.Any(x => x.Price < 0 || x.Price > TransactionRules.MaxAmount || x.Name.Length > 200) ||
+            requestedItems.Sum(x => products.Single(p => p.Id == x.ProductId).Price * x.Quantity) > TransactionRules.MaxAmount)
+            return (null, "Product price, name or order total exceeds the supported limits.");
         var method = (DeliveryMethod)request.Delivery.Method;
         if (method == DeliveryMethod.SellerDelivery && products.Any(x => !x.SellerDeliveryAvailable))
             return (null, "Seller delivery is not available for every product in this order.");
@@ -112,6 +119,8 @@ public class ProductOrderService : IProductOrderService
     public async Task<(ProductOrderDetailsDto? Data, string? Error)> ChangeStatusAsync(
         Guid id, Guid actingBusinessId, ProductOrderStatus status, string? note)
     {
+        if (note?.Length > 500) return (null, "Note must not exceed 500 characters.");
+        await using var dbTransaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         var order = await _db.ProductOrders.Include(x => x.Delivery).Include(x => x.Items).FirstOrDefaultAsync(x => x.Id == id);
         if (order == null) return (null, "Product order was not found.");
         if (order.Status is ProductOrderStatus.Completed or ProductOrderStatus.Delivered or ProductOrderStatus.Cancelled)
@@ -122,8 +131,9 @@ public class ProductOrderService : IProductOrderService
             return (null, "Only the seller can progress this order.");
         if (!IsValidTransition(order, status))
             return (null, $"Cannot change order from {order.Status} to {status} for its delivery method.");
+        if (status == ProductOrderStatus.Ready && string.IsNullOrWhiteSpace(order.Delivery?.Location))
+            return (null, "Set the pickup/delivery address before marking this order ready.");
 
-        await using var dbTransaction = await _db.Database.BeginTransactionAsync();
         if (status == ProductOrderStatus.Cancelled)
         {
             var productIds = order.Items.Select(x => x.ProductId).ToList();
@@ -132,6 +142,8 @@ public class ProductOrderService : IProductOrderService
             {
                 if (!inventories.TryGetValue(item.ProductId, out var inventory))
                     return (null, $"Inventory for {item.ProductName} was not found; cancellation could not safely restore stock.");
+                if ((long)inventory.Quantity + item.Quantity > int.MaxValue)
+                    return (null, "Restoring stock would exceed the supported quantity.");
                 inventory.Quantity += item.Quantity;
                 inventory.IsAvailable = inventory.Quantity > 0;
             }
@@ -153,11 +165,30 @@ public class ProductOrderService : IProductOrderService
         return (await GetByIdAsync(id), null);
     }
 
+    public async Task<ProductOrderDetailsDto> UpdateLocationAsync(Guid id, UpdateDeliveryLocationRequest request)
+    {
+        var order = await _db.ProductOrders.Include(x => x.Delivery).SingleOrDefaultAsync(x => x.Id == id)
+            ?? throw new TransactionRuleException(404, "Product order not found.");
+        if (order.Delivery == null) throw new TransactionRuleException(404, "Delivery not found.");
+        MaterialTransactionService.ValidateLocationEdit(request, order.Delivery, order.BuyerBusinessId, order.SellerBusinessId,
+            order.Status is ProductOrderStatus.Placed or ProductOrderStatus.Confirmed or ProductOrderStatus.Processing,
+            order.UpdatedAt);
+        order.Delivery.Location = request.Location.Trim();
+        order.UpdatedAt = order.Delivery.UpdatedAt = DateTime.UtcNow;
+        _db.ProductOrderStatusHistories.Add(new()
+        {
+            ProductOrderId = id, Status = order.Status, ChangedByBusinessId = request.ActingBusinessId,
+            Note = "Pickup/delivery location updated.", CreatedAt = order.UpdatedAt.Value
+        });
+        await _db.SaveChangesAsync();
+        return (await GetByIdAsync(id))!;
+    }
+
     private async Task<object> GetHistoryAsync(
         System.Linq.Expressions.Expression<Func<ProductOrder, bool>> predicate,
         int page, int pageSize)
     {
-        page = Math.Max(page, 1);
+        page = Math.Clamp(page, 1, 1000000);
         pageSize = Math.Clamp(pageSize, 1, 100);
         var query = BaseQuery().AsNoTracking().Where(predicate).OrderByDescending(x => x.CreatedAt);
         var totalItems = await query.CountAsync();

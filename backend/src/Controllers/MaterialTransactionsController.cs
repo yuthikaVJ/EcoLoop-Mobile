@@ -51,6 +51,14 @@ public class MaterialTransactionsController : ControllerBase
         return item == null ? NotFound() : Ok(item.Delivery);
     }
 
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> UpdateDetails(Guid id, UpdateMaterialTransactionRequest request) =>
+        Ok(await _service.UpdateDetailsAsync(id, request));
+
+    [HttpPut("{id:guid}/delivery")]
+    public async Task<IActionResult> UpdateLocation(Guid id, UpdateDeliveryLocationRequest request) =>
+        Ok(await _service.UpdateLocationAsync(id, request));
+
     [HttpPost("{id:guid}/accept")]
     public Task<IActionResult> Accept(Guid id, TransactionActionRequest request) => Change(id, request, MaterialTransactionStatus.Accepted);
 
@@ -71,6 +79,8 @@ public class MaterialTransactionsController : ControllerBase
 
     private async Task<IActionResult> Change(Guid id, TransactionActionRequest request, MaterialTransactionStatus status)
     {
+        if (request.Note?.Length > 500) return BadRequest(new { message = "Note must not exceed 500 characters." });
+        if (await _service.GetByIdAsync(id) == null) return NotFound(new { message = "Record not found." });
         var result = await _service.ChangeStatusAsync(id, request.ActingBusinessId, status, request.Note);
         return result.Data == null ? BadRequest(new { message = result.Error }) : Ok(result.Data);
     }

@@ -8,12 +8,12 @@ class DeliveryInfo {
   const DeliveryInfo({required this.id, required this.method, this.location});
 
   factory DeliveryInfo.fromJson(Map<String, dynamic> json) => DeliveryInfo(
-        id: json['id']?.toString() ?? '',
-        method: (json['method'] as num? ?? 0).toInt() == 1
-            ? DeliveryMethod.sellerDelivery
-            : DeliveryMethod.selfPickup,
-        location: json['location'] as String?,
-      );
+    id: json['id']?.toString() ?? '',
+    method: (json['method'] as num? ?? 0).toInt() == 1
+        ? DeliveryMethod.sellerDelivery
+        : DeliveryMethod.selfPickup,
+    location: json['location'] as String?,
+  );
 }
 
 class StatusHistoryEntry {
@@ -29,7 +29,8 @@ class StatusHistoryEntry {
     required this.createdAt,
   });
 
-  factory StatusHistoryEntry.fromJson(Map<String, dynamic> json) => StatusHistoryEntry(
+  factory StatusHistoryEntry.fromJson(Map<String, dynamic> json) =>
+      StatusHistoryEntry(
         statusName: json['statusName']?.toString() ?? '',
         changedByBusinessName: json['changedByBusinessName'] as String?,
         note: json['note'] as String?,
@@ -62,7 +63,8 @@ class MaterialTransactionSummary {
     required this.createdAt,
   });
 
-  factory MaterialTransactionSummary.fromJson(Map<String, dynamic> json) => MaterialTransactionSummary(
+  factory MaterialTransactionSummary.fromJson(Map<String, dynamic> json) =>
+      MaterialTransactionSummary(
         id: json['id'].toString(),
         listingTitle: json['listingTitle']?.toString() ?? '',
         buyer: json['buyer']?.toString() ?? '',
@@ -84,6 +86,7 @@ class MaterialTransactionDetails extends MaterialTransactionSummary {
   final double unitPrice;
   final DeliveryInfo? delivery;
   final List<StatusHistoryEntry> statusHistory;
+  final String? updatedAt;
 
   const MaterialTransactionDetails({
     required super.id,
@@ -101,6 +104,7 @@ class MaterialTransactionDetails extends MaterialTransactionSummary {
     required this.unitPrice,
     this.delivery,
     required this.statusHistory,
+    this.updatedAt,
   });
 
   factory MaterialTransactionDetails.fromJson(Map<String, dynamic> json) {
@@ -116,10 +120,13 @@ class MaterialTransactionDetails extends MaterialTransactionSummary {
       statusName: summary.statusName,
       deliveryMethod: summary.deliveryMethod,
       createdAt: summary.createdAt,
+      updatedAt: json['updatedAt'] as String?,
       buyerBusinessId: json['buyerBusinessId'].toString(),
       sellerBusinessId: json['sellerBusinessId'].toString(),
       unitPrice: (json['unitPrice'] as num).toDouble(),
-      delivery: json['delivery'] == null ? null : DeliveryInfo.fromJson(json['delivery']),
+      delivery: json['delivery'] == null
+          ? null
+          : DeliveryInfo.fromJson(json['delivery']),
       statusHistory: (json['statusHistory'] as List? ?? [])
           .map((x) => StatusHistoryEntry.fromJson(x as Map<String, dynamic>))
           .toList(),
@@ -148,7 +155,8 @@ class ProductOrderSummary {
     required this.createdAt,
   });
 
-  factory ProductOrderSummary.fromJson(Map<String, dynamic> json) => ProductOrderSummary(
+  factory ProductOrderSummary.fromJson(Map<String, dynamic> json) =>
+      ProductOrderSummary(
         id: json['id'].toString(),
         buyer: json['buyer']?.toString() ?? '',
         seller: json['seller']?.toString() ?? '',
@@ -169,9 +177,16 @@ class ProductOrderItem {
   final double unitPrice;
   final double lineTotal;
 
-  const ProductOrderItem({required this.productId, required this.productName, required this.quantity, required this.unitPrice, required this.lineTotal});
+  const ProductOrderItem({
+    required this.productId,
+    required this.productName,
+    required this.quantity,
+    required this.unitPrice,
+    required this.lineTotal,
+  });
 
-  factory ProductOrderItem.fromJson(Map<String, dynamic> json) => ProductOrderItem(
+  factory ProductOrderItem.fromJson(Map<String, dynamic> json) =>
+      ProductOrderItem(
         productId: json['productId'].toString(),
         productName: json['productName'].toString(),
         quantity: (json['quantity'] as num).toInt(),
@@ -186,6 +201,7 @@ class ProductOrderDetails extends ProductOrderSummary {
   final List<ProductOrderItem> items;
   final DeliveryInfo? delivery;
   final List<StatusHistoryEntry> statusHistory;
+  final String? updatedAt;
 
   const ProductOrderDetails({
     required super.id,
@@ -201,6 +217,7 @@ class ProductOrderDetails extends ProductOrderSummary {
     required this.items,
     this.delivery,
     required this.statusHistory,
+    this.updatedAt,
   });
 
   factory ProductOrderDetails.fromJson(Map<String, dynamic> json) {
@@ -214,11 +231,18 @@ class ProductOrderDetails extends ProductOrderSummary {
       statusName: summary.statusName,
       deliveryMethod: summary.deliveryMethod,
       createdAt: summary.createdAt,
+      updatedAt: json['updatedAt'] as String?,
       buyerBusinessId: json['buyerBusinessId'].toString(),
       sellerBusinessId: json['sellerBusinessId'].toString(),
-      items: (json['items'] as List? ?? []).map((x) => ProductOrderItem.fromJson(x)).toList(),
-      delivery: json['delivery'] == null ? null : DeliveryInfo.fromJson(json['delivery']),
-      statusHistory: (json['statusHistory'] as List? ?? []).map((x) => StatusHistoryEntry.fromJson(x)).toList(),
+      items: (json['items'] as List? ?? [])
+          .map((x) => ProductOrderItem.fromJson(x))
+          .toList(),
+      delivery: json['delivery'] == null
+          ? null
+          : DeliveryInfo.fromJson(json['delivery']),
+      statusHistory: (json['statusHistory'] as List? ?? [])
+          .map((x) => StatusHistoryEntry.fromJson(x))
+          .toList(),
     );
   }
 }

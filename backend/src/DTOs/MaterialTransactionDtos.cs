@@ -18,6 +18,22 @@ public class TransactionActionRequest
     public string? Note { get; set; }
 }
 
+public class UpdateMaterialTransactionRequest
+{
+    public Guid ActingBusinessId { get; set; }
+    public decimal Quantity { get; set; }
+    public string Unit { get; set; } = string.Empty;
+    public decimal UnitPrice { get; set; }
+    public DateTime? ExpectedUpdatedAt { get; set; }
+}
+
+public class UpdateDeliveryLocationRequest
+{
+    public Guid ActingBusinessId { get; set; }
+    public string Location { get; set; } = string.Empty;
+    public DateTime? ExpectedUpdatedAt { get; set; }
+}
+
 public class DeliveryInputDto
 {
     public int Method { get; set; }

@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options => options.Filters.Add<EcoLoop.Api.Controllers.TransactionExceptionFilter>());
 
 builder.Services.AddDbContext<EcoLoopDbContext>(options =>
     options.UseNpgsql(
@@ -18,6 +18,8 @@ builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IMaterialListingService, MaterialListingService>();
 builder.Services.AddScoped<IMaterialTransactionService, MaterialTransactionService>();
 builder.Services.AddScoped<IProductOrderService, ProductOrderService>();
+builder.Services.AddScoped<DeliveryLocationService>();
+builder.Services.AddHttpClient<DeliveryRouteService>(client => client.Timeout = TimeSpan.FromSeconds(15));
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

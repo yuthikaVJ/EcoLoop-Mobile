@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace EcoLoop.Api.Models;
 
 public class ProductOrder
@@ -5,9 +7,11 @@ public class ProductOrder
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid BuyerBusinessId { get; set; }
     public Guid SellerBusinessId { get; set; }
+    [ConcurrencyCheck]
     public ProductOrderStatus Status { get; set; } = ProductOrderStatus.Placed;
     public decimal TotalAmount { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    [ConcurrencyCheck]
     public DateTime? UpdatedAt { get; set; }
 
     public Business? BuyerBusiness { get; set; }

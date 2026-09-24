@@ -11,15 +11,17 @@ class StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: terminalError ? AppColors.errorRed.withOpacity(0.12) : AppColors.mintGreen,
+        color: terminalError
+            ? AppColors.errorRed.withValues(alpha: 0.12)
+            : AppColors.mintGreen,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         status,
         style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: terminalError ? AppColors.errorRed : AppColors.forestGreen,
-              fontWeight: FontWeight.bold,
-            ),
+          color: terminalError ? AppColors.errorRed : AppColors.forestGreen,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }

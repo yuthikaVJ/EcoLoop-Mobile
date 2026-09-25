@@ -3,7 +3,9 @@ name: Backend CI
 on:
   push:
     branches:
-      - main, dev-**,deploy
+      - main
+      - 'dev-*'
+      - deploy
   pull_request:
     branches:
       - main

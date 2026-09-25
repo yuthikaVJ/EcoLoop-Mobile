@@ -5,7 +5,7 @@ on:
     branches:
       - main
       - 'dev-*'
-      - deploy
+      
   pull_request:
     branches:
       - main

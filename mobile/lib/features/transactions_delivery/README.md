@@ -93,13 +93,10 @@ Editing requests send the exact `expectedUpdatedAt` string returned by the API
 - Group JWT/authentication remains absent. Business/actor IDs still use the existing
   demo contract; party checks are NOT authenticated authorization. Replace these
   with the shared business claim before exposing the API beyond local development.
-- Component 2 must provide real listing GUIDs/business/unit/availability. The
-  confirmation page now maps I NEED owner as buyer and current business as seller,
-  and rejects placeholder IDs before sending a request. The group must agree the
-  authenticated I NEED initiation/offer policy. No marketplace was rebuilt here.
-- Component 3 must navigate to `ProductCheckoutPage(items: ...)` with real products.
-  Product stock coordination benefits from the shared Inventory concurrency tokens;
-  independent product/inventory validation and shopping screens remain team work.
+- Material and product catalogs are now connected to transaction/checkout screens.
+  The group must still agree authenticated I NEED initiation/offer policy.
+- Product publishing and inventory management use the existing backend APIs;
+  seller product-management screens remain Component 3 work.
 - Material quantity reservation/fulfilment policy requires Component 2 agreement;
   this implementation does not change the listing's text quantity or close listings.
 - React foundation/admin screens and identity architecture remain group dependencies.
@@ -122,3 +119,46 @@ Final checks on 24 September 2026: backend tests **21 passed**, Flutter tests
 **no issues**. Whole-app analysis earlier in this implementation also identified
 existing deprecation notices in the shared theme and teammate marketplace/home code;
 those are outside this change's scope.
+
+
+## Project integration - 27 September 2026
+
+- Home quick actions open material posting, products, and transaction history.
+- Materials and Home load published records with real business IDs, units,
+  descriptions, and delivery availability. Loading failures provide retry.
+- Material posting sends multipart data (one optional image) to the API.
+  My Listings reads the configured business's Active/Completed records and persists
+  edits, completion and deletion. Returning to the marketplace refreshes the list.
+- Products replaces the placeholder tab: live catalog, search, stock-limited quantity
+  selection and Buy Now open Component 4 checkout. Each checkout orders one selected
+  product; this UI does not implement a multi-product cart. Returning refreshes stock.
+- Activity opens all four buyer/seller histories and saved locations. Products has
+  a My orders shortcut. Own products/listings cannot start a self-purchase in the UI.
+- `core/config/app_config.dart` is the shared API/business configuration.
+  `Component4Config` is a compatibility alias. This remains a development identity,
+  not a login session: there is no auth implementation in this checkout.
+
+### Run and test the connected flows
+
+1. Start the backend from `backend` using `dotnet run --launch-profile http`.
+2. Start Flutter from `mobile` with `flutter run`. Android emulator defaults to
+   `http://10.0.2.2:5252/api` and business `22222222-2222-2222-2222-222222222222`.
+   For a physical phone use `--dart-define=ECOLOOP_API_URL=http://<PC-LAN-IP>:5252/api`
+   and bind the development backend to that reachable interface.
+3. Use a second emulator/build with
+   `--dart-define=ECOLOOP_BUSINESS_ID=11111111-1111-1111-1111-111111111111`
+   for the other business. Both development businesses already exist in startup seeding.
+4. Post a material under one business; open it from the other business and submit
+   a transaction. Use Activity on each side for status changes and delivery locations.
+5. Product records need stock created via the existing product and inventory APIs.
+   No fake products or orders are inserted by the mobile catalog. Buy Now opens
+   checkout; verify the order under Activity and seller actions under Received Orders.
+
+Verification: 24 backend tests and 15 Flutter tests passed. Added coverage includes
+catalog-to-transaction identity, catalog stock after checkout/cancellation, persisted
+My Listings statuses, multipart posting, product quantity navigation and blocked
+self/out-of-stock purchases. Live read-only HTTP checks against local PostgreSQL
+succeeded for materials, products, completed listings, buyer histories and saved
+locations. At verification the database had one active material and no products.
+Full two-device interaction and configured Google Maps remain unverified. No database
+migration was needed for these integration changes.

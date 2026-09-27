@@ -23,6 +23,7 @@ public class UpdateProductRequest
 
 public class ProductListDto
 {
+    public Guid BusinessId { get; set; }
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
@@ -38,6 +39,7 @@ public class ProductListDto
 
 public class ProductDetailsDto
 {
+    public Guid BusinessId { get; set; }
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;

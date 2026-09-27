@@ -6,11 +6,13 @@ import '../widgets/activity_card.dart';
 import 'transaction_detail_page.dart';
 
 class TransactionsHubPage extends StatelessWidget {
-  const TransactionsHubPage({super.key});
+  final int initialIndex;
+  const TransactionsHubPage({super.key, this.initialIndex = 0});
 
   @override
   Widget build(BuildContext context) => DefaultTabController(
     length: 4,
+    initialIndex: initialIndex,
     child: Scaffold(
       appBar: AppBar(
         title: const Text('Transactions & Orders'),

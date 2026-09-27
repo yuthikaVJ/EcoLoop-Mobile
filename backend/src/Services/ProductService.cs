@@ -74,6 +74,7 @@ public class ProductService : IProductService
             .Select(product => new ProductListDto
             {
                 Id = product.Id,
+                BusinessId = product.BusinessId,
                 Name = product.Name,
                 Description = product.Description,
                 MaterialType = product.MaterialType,
@@ -88,7 +89,7 @@ public class ProductService : IProductService
                                     product.Business.IsVerified,
                 AvailableQuantity = product.Inventory == null
                     ? 0
-                    : product.Inventory.AvailableQuantity,
+                    : (product.Inventory.IsAvailable ? product.Inventory.Quantity : 0),
                 PrimaryImageUrl = product.Images
                     .Where(image => image.IsPrimary)
                     .Select(image => image.ImageUrl)
@@ -116,6 +117,7 @@ public class ProductService : IProductService
             .Select(product => new ProductDetailsDto
             {
                 Id = product.Id,
+                BusinessId = product.BusinessId,
                 Name = product.Name,
                 Description = product.Description,
                 MaterialType = product.MaterialType,
@@ -130,7 +132,7 @@ public class ProductService : IProductService
                                     product.Business.IsVerified,
                 AvailableQuantity = product.Inventory == null
                     ? 0
-                    : product.Inventory.AvailableQuantity,
+                    : (product.Inventory.IsAvailable ? product.Inventory.Quantity : 0),
                 Images = product.Images
                     .OrderBy(image => image.DisplayOrder)
                     .Select(image => image.ImageUrl)

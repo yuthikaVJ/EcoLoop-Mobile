@@ -1,3 +1,5 @@
+import '../../features/sustainable_products/presentation/pages/products_page.dart';
+import '../../features/transactions_delivery/presentation/pages/transactions_hub_page.dart';
 import 'package:flutter/material.dart';
 
 import '../../features/home/presentation/pages/home_page.dart';
@@ -16,8 +18,8 @@ class _AppShellState extends State<AppShell> {
   final List<Widget> _pages = [
     const HomePage(),
     const MaterialsMarketplacePage(),
-    const Center(child: Text('Products (Coming Soon)')),
-    const Center(child: Text('Notifications (Coming Soon)')),
+    const ProductsPage(),
+    const TransactionsHubPage(),
     const Center(child: Text('Profile (Coming Soon)')),
   ];
 
@@ -49,9 +51,9 @@ class _AppShellState extends State<AppShell> {
             label: 'Products',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.notifications_outlined),
-            activeIcon: Icon(Icons.notifications),
-            label: 'Notifications',
+            icon: Icon(Icons.receipt_long_outlined),
+            activeIcon: Icon(Icons.receipt_long),
+            label: 'Activity',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),

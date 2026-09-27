@@ -1,4 +1,6 @@
 class MaterialListing {
+  final String description;
+  final String quantityValue;
   final String id;
   final String title;
   final String category;
@@ -16,6 +18,8 @@ class MaterialListing {
   final bool sellerDeliveryAvailable;
 
   MaterialListing({
+    this.description = '',
+    this.quantityValue = '',
     required this.id,
     required this.title,
     required this.category,
@@ -32,6 +36,26 @@ class MaterialListing {
     this.unit = 'Tons',
     this.sellerDeliveryAvailable = false,
   });
+  factory MaterialListing.fromJson(Map<String, dynamic> json) =>
+      MaterialListing(
+        id: json['id'] as String,
+        businessId: json['businessId'] as String,
+        title: json['title'] as String,
+        description: json['description'] as String? ?? '',
+        category: json['category'] as String,
+        quantity: '${json['quantity']} ${json['unit']}',
+        quantityValue: json['quantity'].toString(),
+        unit: json['unit'] as String,
+        location: json['location'] as String,
+        companyName: json['seller'] as String? ?? 'Seller',
+        price: (json['price'] as num).toDouble(),
+        priceUnit: json['priceUnit'] as String,
+        isVerifiedSeller: json['sellerIsVerified'] == true,
+        imageUrl: json['imageUrl'] as String? ?? '',
+        isIHave: json['type'] == 0,
+        datePosted: DateTime.parse(json['createdAt'] as String),
+        sellerDeliveryAvailable: json['sellerDeliveryAvailable'] == true,
+      );
 }
 
 // Dummy data for development
@@ -203,5 +227,5 @@ List<MaterialListing> get dummyListings => [
     imageUrl: 'https://via.placeholder.com/150',
     isIHave: false,
     datePosted: DateTime.now().subtract(const Duration(days: 10)),
-  )
+  ),
 ];

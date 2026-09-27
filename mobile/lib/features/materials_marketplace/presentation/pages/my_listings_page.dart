@@ -1,3 +1,5 @@
+import '../../../transactions_delivery/data/services/component4_api_service.dart';
+import 'add_material_page.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/material_listing.dart';
@@ -10,77 +12,119 @@ class MyListingsPage extends StatefulWidget {
   State<MyListingsPage> createState() => _MyListingsPageState();
 }
 
-class _MyListingsPageState extends State<MyListingsPage> with SingleTickerProviderStateMixin {
+class _MyListingsPageState extends State<MyListingsPage>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  
-  // Using dummy data to simulate the user's listings
-  late List<MaterialListing> _activeListings;
-  late List<MaterialListing> _completedListings;
+
+  final _api = Component4ApiService();
+  List<MaterialListing> _activeListings = [];
+  List<MaterialListing> _completedListings = [];
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    
-    // Initialize dummy data state
-    _activeListings = dummyListings.take(4).toList();
-    _completedListings = dummyListings.skip(4).take(2).toList();
+    _load();
   }
 
   @override
   void dispose() {
+    _api.dispose();
     _tabController.dispose();
     super.dispose();
   }
 
-  void _deleteListing(MaterialListing listing, bool isActive) {
-    showDialog(
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final lists = await Future.wait([
+        _api.getMaterialListings(
+          businessId: Component4Config.currentBusinessId,
+        ),
+        _api.getMaterialListings(
+          businessId: Component4Config.currentBusinessId,
+          status: 1,
+        ),
+      ]);
+      if (mounted) {
+        setState(() {
+          _activeListings = lists[0];
+          _completedListings = lists[1];
+        });
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _changeStatus(MaterialListing listing, int status) async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    try {
+      await _api.changeListingStatus(listing.id, status);
+      if (mounted) await _load();
+    } catch (error) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    }
+  }
+
+  Future<void> _deleteListing(MaterialListing listing, bool isActive) async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Listing'),
-        content: Text('Are you sure you want to delete "${listing.title}"?'),
+        content: Text('Delete "${listing.title}"?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-            onPressed: () {
-              setState(() {
-                if (isActive) {
-                  _activeListings.remove(listing);
-                } else {
-                  _completedListings.remove(listing);
-                }
-              });
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Listing deleted')),
-              );
-            },
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
             child: const Text('Delete'),
           ),
         ],
       ),
     );
+    if (confirmed == true && mounted) await _changeStatus(listing, 2);
   }
 
-  void _markAsSold(MaterialListing listing) {
-    setState(() {
-      _activeListings.remove(listing);
-      _completedListings.insert(0, listing);
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Listing marked as completed')),
+  Future<void> _edit(MaterialListing listing) async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => AddMaterialPage(listing: listing)),
     );
+    if (saved == true && mounted) await _load();
   }
+
+  void _markAsSold(MaterialListing listing) => _changeStatus(listing, 1);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Listings', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'My Listings',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        actions: [
+          IconButton(
+            onPressed: _loading ? null : _load,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: AppColors.forestGreen,
@@ -92,45 +136,60 @@ class _MyListingsPageState extends State<MyListingsPage> with SingleTickerProvid
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          // Active Tab
-          _activeListings.isEmpty
-              ? _buildEmptyState('You have no active listings.')
-              : ListView.builder(
-                  padding: const EdgeInsets.only(top: 8, bottom: 80),
-                  itemCount: _activeListings.length,
-                  itemBuilder: (context, index) {
-                    return MyListingCard(
-                      listing: _activeListings[index],
-                      isActive: true,
-                      onEdit: () {
-                        // TODO: Navigate to Edit screen
-                      },
-                      onDelete: () => _deleteListing(_activeListings[index], true),
-                      onMarkSold: () => _markAsSold(_activeListings[index]),
-                    );
-                  },
-                ),
-                
-          // Completed Tab
-          _completedListings.isEmpty
-              ? _buildEmptyState('You have no completed listings.')
-              : ListView.builder(
-                  padding: const EdgeInsets.only(top: 8, bottom: 80),
-                  itemCount: _completedListings.length,
-                  itemBuilder: (context, index) {
-                    return MyListingCard(
-                      listing: _completedListings[index],
-                      isActive: false,
-                      onEdit: () {},
-                      onDelete: () => _deleteListing(_completedListings[index], false),
-                    );
-                  },
-                ),
-        ],
-      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_error!, textAlign: TextAlign.center),
+                  TextButton(onPressed: _load, child: const Text('Retry')),
+                ],
+              ),
+            )
+          : TabBarView(
+              controller: _tabController,
+              children: [
+                // Active Tab
+                _activeListings.isEmpty
+                    ? _buildEmptyState('You have no active listings.')
+                    : ListView.builder(
+                        padding: const EdgeInsets.only(top: 8, bottom: 80),
+                        itemCount: _activeListings.length,
+                        itemBuilder: (context, index) {
+                          return MyListingCard(
+                            listing: _activeListings[index],
+                            isActive: true,
+                            onEdit: () => _edit(_activeListings[index]),
+                            onDelete: () =>
+                                _deleteListing(_activeListings[index], true),
+                            onMarkSold: () =>
+                                _markAsSold(_activeListings[index]),
+                          );
+                        },
+                      ),
+
+                // Completed Tab
+                _completedListings.isEmpty
+                    ? _buildEmptyState('You have no completed listings.')
+                    : ListView.builder(
+                        padding: const EdgeInsets.only(top: 8, bottom: 80),
+                        itemCount: _completedListings.length,
+                        itemBuilder: (context, index) {
+                          return MyListingCard(
+                            listing: _completedListings[index],
+                            isActive: false,
+                            onEdit: () {},
+                            onDelete: () => _deleteListing(
+                              _completedListings[index],
+                              false,
+                            ),
+                          );
+                        },
+                      ),
+              ],
+            ),
     );
   }
 
@@ -139,7 +198,11 @@ class _MyListingsPageState extends State<MyListingsPage> with SingleTickerProvid
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.inventory_2_outlined, size: 64, color: AppColors.slateGray.withOpacity(0.5)),
+          Icon(
+            Icons.inventory_2_outlined,
+            size: 64,
+            color: AppColors.slateGray.withOpacity(0.5),
+          ),
           const SizedBox(height: 16),
           Text(
             message,

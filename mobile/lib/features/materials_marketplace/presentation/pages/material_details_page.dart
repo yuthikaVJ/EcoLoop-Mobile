@@ -1,3 +1,4 @@
+import '../../../../core/config/app_config.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/material_listing.dart';
@@ -45,7 +46,11 @@ class MaterialDetailsPage extends StatelessWidget {
                     tag: heroTag,
                     child: Container(
                       color: AppColors.mintGreen,
-                      child: const Icon(Icons.image_outlined, size: 100, color: AppColors.ecoGreen),
+                      child: const Icon(
+                        Icons.image_outlined,
+                        size: 100,
+                        color: AppColors.ecoGreen,
+                      ),
                     ),
                   ),
                   // Dark gradient overlay for text readability if we add title to FlexibleSpaceBar
@@ -65,7 +70,7 @@ class MaterialDetailsPage extends StatelessWidget {
               ),
             ),
           ),
-          
+
           // Content
           SliverToBoxAdapter(
             child: Padding(
@@ -78,41 +83,52 @@ class MaterialDetailsPage extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.mintGreen,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           listing.category,
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: AppColors.forestGreen,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: AppColors.forestGreen,
+                                fontWeight: FontWeight.bold,
+                              ),
                         ),
                       ),
                       if (listing.isVerifiedSeller)
                         Row(
                           children: [
-                            const Icon(Icons.verified, color: AppColors.forestGreen, size: 16),
+                            const Icon(
+                              Icons.verified,
+                              color: AppColors.forestGreen,
+                              size: 16,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               'Verified Seller',
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: AppColors.forestGreen,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
+                                    color: AppColors.forestGreen,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                             ),
                           ],
                         ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  
+
                   // Title & Price
                   Text(
                     listing.title,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -123,9 +139,12 @@ class MaterialDetailsPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Specifications Grid
-                  const Text('Specifications', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  const Text(
+                    'Specifications',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -136,49 +155,88 @@ class MaterialDetailsPage extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
-                        _buildSpecRow(Icons.inventory_2_outlined, 'Quantity', listing.quantity),
+                        _buildSpecRow(
+                          Icons.inventory_2_outlined,
+                          'Quantity',
+                          listing.quantity,
+                        ),
                         const Divider(height: 24),
-                        _buildSpecRow(Icons.location_on_outlined, 'Location', listing.location),
+                        _buildSpecRow(
+                          Icons.location_on_outlined,
+                          'Location',
+                          listing.location,
+                        ),
                         const Divider(height: 24),
-                        _buildSpecRow(Icons.local_shipping_outlined, 'Delivery', listing.sellerDeliveryAvailable ? 'Self Pickup / Seller Delivery' : 'Self Pickup'),
+                        _buildSpecRow(
+                          Icons.local_shipping_outlined,
+                          'Delivery',
+                          listing.sellerDeliveryAvailable
+                              ? 'Self Pickup / Seller Delivery'
+                              : 'Self Pickup',
+                        ),
                         const Divider(height: 24),
-                        _buildSpecRow(Icons.access_time_outlined, 'Date Posted', _formatDate(listing.datePosted)),
+                        _buildSpecRow(
+                          Icons.access_time_outlined,
+                          'Date Posted',
+                          _formatDate(listing.datePosted),
+                        ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Description
-                  const Text('Description', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  const Text(
+                    'Description',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
                   const SizedBox(height: 12),
                   Text(
-                    'This is a placeholder description for ${listing.title}. Here the seller would provide detailed information regarding the quality, exact condition, and any other relevant specifics about the material being offered or requested.',
-                    style: const TextStyle(height: 1.5, color: AppColors.slateGray),
+                    listing.description.isEmpty
+                        ? 'No description provided.'
+                        : listing.description,
+                    style: const TextStyle(
+                      height: 1.5,
+                      color: AppColors.slateGray,
+                    ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Seller Info
-                  const Text('Seller Information', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  const Text(
+                    'Seller Information',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
                   const SizedBox(height: 12),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: CircleAvatar(
                       backgroundColor: AppColors.mintGreen,
                       child: Text(
-                        listing.companyName.substring(0, 1),
-                        style: const TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.bold),
+                        listing.companyName.isEmpty
+                            ? '?'
+                            : listing.companyName.substring(0, 1),
+                        style: const TextStyle(
+                          color: AppColors.forestGreen,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                    title: Text(listing.companyName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    title: Text(
+                      listing.companyName,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     subtitle: const Text('Member since 2024 • 4.8 Rating'),
                     trailing: const Icon(Icons.chevron_right),
                   ),
-                  
-                  const SizedBox(height: 80), // Bottom padding for FAB/BottomBar
+
+                  const SizedBox(
+                    height: 80,
+                  ), // Bottom padding for FAB/BottomBar
                 ],
               ),
             ),
-          )
+          ),
         ],
       ),
       bottomNavigationBar: Container(
@@ -190,22 +248,37 @@ class MaterialDetailsPage extends StatelessWidget {
               color: AppColors.slateGray.withOpacity(0.1),
               blurRadius: 10,
               offset: const Offset(0, -5),
-            )
+            ),
           ],
         ),
         child: Row(
           children: [
             Expanded(
               child: OutlinedButton(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatPage(listing: listing))),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => ChatPage(listing: listing)),
+                ),
                 child: const Text('Contact Seller'),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: ElevatedButton(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ConfirmMaterialTransactionPage(listing: listing))),
-                child: const Text('Start Transaction'),
+                onPressed: listing.businessId == AppConfig.currentBusinessId
+                    ? null
+                    : () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              ConfirmMaterialTransactionPage(listing: listing),
+                        ),
+                      ),
+                child: Text(
+                  listing.businessId == AppConfig.currentBusinessId
+                      ? 'Your Listing'
+                      : 'Start Transaction',
+                ),
               ),
             ),
           ],

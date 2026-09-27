@@ -52,6 +52,17 @@ class MaterialListingsNotifier extends AsyncNotifier<List<MaterialListing>> {
     }
   }
 
+  Future<void> updateListing(String id, Map<String, dynamic> requestData) async {
+    try {
+      final updatedListing = await _repository.updateListing(id, requestData);
+      state = state.whenData((currentListings) {
+        return currentListings.map((l) => l.id == id ? updatedListing : l).toList();
+      });
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<void> changeStatus(String id, int newStatus) async {
     try {
       final success = await _repository.changeStatus(id, newStatus);

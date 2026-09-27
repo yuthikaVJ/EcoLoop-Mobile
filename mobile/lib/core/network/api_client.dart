@@ -13,8 +13,13 @@ class ApiClient {
     final token = await _authRepository.getSavedToken();
     return {
       'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache',
       if (token != null) 'Authorization': 'Bearer $token',
     };
+  }
+
+  Future<bool> refreshToken() async {
+    return await _authRepository.refreshToken();
   }
   
   String _buildUrl(String path, Map<String, dynamic>? queryParameters) {
@@ -94,6 +99,23 @@ class ApiClient {
           Uri.parse(url), 
           headers: await getAuthHeaders(), 
           body: body
+        );
+      }
+    }
+    return response;
+  }
+  Future<http.Response> delete(String path) async {
+    String url = _buildUrl(path, null);
+    var response = await http.delete(
+      Uri.parse(url), 
+      headers: await getAuthHeaders()
+    );
+    if (response.statusCode == 401) {
+      final refreshed = await _authRepository.refreshToken();
+      if (refreshed) {
+        response = await http.delete(
+          Uri.parse(url), 
+          headers: await getAuthHeaders()
         );
       }
     }

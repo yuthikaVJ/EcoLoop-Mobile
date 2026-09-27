@@ -5,6 +5,7 @@ import '../../domain/entities/material_listing.dart';
 import '../providers/material_listings_provider.dart';
 import '../../../profile/presentation/providers/profile_provider.dart';
 import '../widgets/my_listing_card.dart';
+import 'edit_material_page.dart';
 
 class MyListingsPage extends ConsumerStatefulWidget {
   const MyListingsPage({super.key});
@@ -139,8 +140,16 @@ class _MyListingsPageState extends ConsumerState<MyListingsPage> with SingleTick
                       return MyListingCard(
                         listing: myActive[index],
                         isActive: true,
-                        onEdit: () {
-                          // TODO: Navigate to Edit screen
+                        onEdit: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => EditMaterialPage(listing: myActive[index]),
+                            ),
+                          );
+                          if (result == true) {
+                            // Status update handled in notifier, but we could force a refresh if needed
+                          }
                         },
                         onDelete: () => _deleteListing(myActive[index], true),
                         onMarkSold: () => _markAsSold(myActive[index]),

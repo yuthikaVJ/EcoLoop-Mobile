@@ -45,4 +45,32 @@ class Product {
       images: imageList,
     );
   }
+
+  Product copyWith({
+    String? id,
+    String? name,
+    String? description,
+    String? materialType,
+    double? price,
+    String? category,
+    String? seller,
+    bool? sellerIsVerified,
+    int? availableQuantity,
+    String? primaryImageUrl,
+    List<String>? images,
+  }) {
+    return Product(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      materialType: materialType ?? this.materialType,
+      price: price ?? this.price,
+      category: category ?? this.category,
+      seller: seller ?? this.seller,
+      sellerIsVerified: sellerIsVerified ?? this.sellerIsVerified,
+      availableQuantity: availableQuantity ?? this.availableQuantity,
+      primaryImageUrl: primaryImageUrl ?? this.primaryImageUrl,
+      images: images ?? this.images,
+    );
+  }
 }

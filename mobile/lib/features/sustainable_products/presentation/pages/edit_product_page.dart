@@ -8,15 +8,18 @@ import '../../../../core/network/api_client_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../profile/presentation/providers/profile_provider.dart';
 import '../../data/product_repository.dart';
+import '../../domain/entities/product.dart';
 
-class AddProductPage extends ConsumerStatefulWidget {
-  const AddProductPage({super.key});
+class EditProductPage extends ConsumerStatefulWidget {
+  final Product product;
+  
+  const EditProductPage({super.key, required this.product});
 
   @override
-  ConsumerState<AddProductPage> createState() => _AddProductPageState();
+  ConsumerState<EditProductPage> createState() => _EditProductPageState();
 }
 
-class _AddProductPageState extends ConsumerState<AddProductPage> {
+class _EditProductPageState extends ConsumerState<EditProductPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _descController = TextEditingController();
@@ -37,6 +40,11 @@ class _AddProductPageState extends ConsumerState<AddProductPage> {
   @override
   void initState() {
     super.initState();
+    _nameController.text = widget.product.name;
+    _descController.text = widget.product.description;
+    _materialController.text = widget.product.materialType;
+    _priceController.text = widget.product.price.toStringAsFixed(2);
+    _stockController.text = widget.product.availableQuantity.toString();
     _loadCategories();
   }
 
@@ -119,6 +127,11 @@ class _AddProductPageState extends ConsumerState<AddProductPage> {
       if (mounted) {
         setState(() {
           _categories = cats;
+          // Find matching category ID
+          final catId = cats.firstWhere((c) => c['name'] == widget.product.category, orElse: () => {})['id'];
+          if (catId != null) {
+            _selectedCategoryId = catId.toString();
+          }
           _loadingCategories = false;
         });
       }
@@ -154,33 +167,21 @@ class _AddProductPageState extends ConsumerState<AddProductPage> {
         throw Exception('User profile not found. Please setup your profile first.');
       }
 
-      // 1. Create the product
-      final productBody = jsonEncode({
+      // 1. Update the product
+      final productBody = {
         'categoryId': _selectedCategoryId,
-        'businessId': profile.id,
         'name': _nameController.text.trim(),
         'description': _descController.text.trim(),
         'materialType': _materialController.text.trim(),
         'price': double.parse(_priceController.text.trim()),
         'availableQuantity': int.parse(_stockController.text.trim()),
-      });
+      };
 
-      final productResponse = await apiClient.post('/api/products', body: productBody);
+      await ref.read(productRepositoryProvider).updateProduct(widget.product.id, productBody);
 
       if (!mounted) return;
 
-      if (productResponse.statusCode != 201 && productResponse.statusCode != 200) {
-        final msg = productResponse.body.isNotEmpty
-            ? productResponse.body
-            : 'Error (${productResponse.statusCode})';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to create product: $msg'), backgroundColor: AppColors.errorRed),
-        );
-        return;
-      }
-
-      final createdProduct = jsonDecode(productResponse.body);
-      final String productId = createdProduct['id'].toString();
+      final String productId = widget.product.id;
 
       // 2. Upload images if any
       for (int i = 0; i < _images.length; i++) {
@@ -201,7 +202,7 @@ class _AddProductPageState extends ConsumerState<AddProductPage> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Product listed successfully! 🌿'),
+          content: Text('Product updated successfully! 🌿'),
           backgroundColor: AppColors.forestGreen,
         ),
       );
@@ -220,7 +221,7 @@ class _AddProductPageState extends ConsumerState<AddProductPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('List a Product', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Edit Product', style: TextStyle(fontWeight: FontWeight.bold)),
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).pop(),
@@ -492,7 +493,7 @@ class _AddProductPageState extends ConsumerState<AddProductPage> {
                       )
                     : const Icon(Icons.check_circle_outline),
                 label: Text(
-                  _submitting ? 'Publishing…' : 'Publish Product',
+                  _submitting ? 'Updating…' : 'Update Product',
                   style: const TextStyle(
                       fontSize: 16, fontWeight: FontWeight.bold),
                 ),

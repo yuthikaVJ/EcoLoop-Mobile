@@ -59,6 +59,30 @@ class ProductRepository {
     }
   }
 
+  Future<void> updateProduct(String id, Map<String, dynamic> data) async {
+    final response = await apiClient.put(
+      '/api/products/$id',
+      body: jsonEncode(data),
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Failed to update product');
+    }
+  }
+
+  Future<void> deleteProduct(String id) async {
+    final response = await apiClient.delete('/api/products/$id');
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Failed to delete product');
+    }
+  }
+
+  Future<void> markAsSold(String id) async {
+    final response = await apiClient.delete('/api/products/$id/inventory');
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Failed to mark as sold');
+    }
+  }
+
   Future<void> purchaseProduct(String id, int quantity) async {
     final response = await apiClient.post(
       '/api/products/$id/purchase',

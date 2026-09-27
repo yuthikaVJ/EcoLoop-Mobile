@@ -6,6 +6,7 @@ import 'data/product_repository.dart';
 import 'domain/entities/product.dart';
 import 'presentation/pages/product_details_page.dart';
 import 'presentation/pages/add_product_page.dart';
+import 'presentation/pages/my_products_page.dart';
 import 'presentation/widgets/product_image_widget.dart';
 
 class SustainableProductMarketplacePage extends ConsumerStatefulWidget {
@@ -53,32 +54,49 @@ class _SustainableProductMarketplacePageState
     return Scaffold(
       body: Column(
         children: [
-          // ── Search bar ────────────────────────────────────────────────
+          // ── Search bar & Shortcuts ──────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: TextField(
-              controller: _searchController,
-              textInputAction: TextInputAction.search,
-              onSubmitted: (_) => _loadProducts(),
-              decoration: InputDecoration(
-                hintText: 'Search products…',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: ValueListenableBuilder<TextEditingValue>(
-                  valueListenable: _searchController,
-                  builder: (context, value, child) {
-                    if (value.text.isEmpty) {
-                      return const SizedBox.shrink();
-                    }
-                    return IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                        _loadProducts();
-                      },
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    textInputAction: TextInputAction.search,
+                    onSubmitted: (_) => _loadProducts(),
+                    decoration: InputDecoration(
+                      hintText: 'Search products…',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _searchController,
+                        builder: (context, value, child) {
+                          if (value.text.isEmpty) {
+                            return const SizedBox.shrink();
+                          }
+                          return IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              _loadProducts();
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.list_alt, color: AppColors.forestGreen),
+                  tooltip: 'My Products',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const MyProductsPage()),
                     );
                   },
                 ),
-              ),
+              ],
             ),
           ),
 

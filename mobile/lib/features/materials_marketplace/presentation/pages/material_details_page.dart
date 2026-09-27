@@ -142,11 +142,11 @@ class MaterialDetailsPage extends StatelessWidget {
                     child: Column(
                       children: [
                         _buildSpecRow(Icons.inventory_2_outlined, 'Quantity', listing.quantity),
-                        const Divider(height: 24),
+                        const SizedBox(height: 20),
                         _buildSpecRow(Icons.location_on_outlined, 'Location', listing.location),
-                        const Divider(height: 24),
+                        const SizedBox(height: 20),
                         _buildSpecRow(Icons.local_shipping_outlined, 'Delivery', 'Seller Delivery / Self Pickup'),
-                        const Divider(height: 24),
+                        const SizedBox(height: 20),
                         _buildSpecRow(Icons.access_time_outlined, 'Date Posted', _formatDate(listing.datePosted)),
                       ],
                     ),
@@ -220,12 +220,19 @@ class MaterialDetailsPage extends StatelessWidget {
 
   Widget _buildSpecRow(IconData icon, String label, String value) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, color: AppColors.ecoGreen, size: 20),
         const SizedBox(width: 12),
         Text(label, style: const TextStyle(color: AppColors.slateGray)),
-        const Spacer(),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Text(
+            value, 
+            textAlign: TextAlign.right,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
       ],
     );
   }

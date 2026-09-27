@@ -81,8 +81,22 @@ class MaterialListingRepository {
       var response = await http.Response.fromStream(streamedResponse);
       
       if (response.statusCode == 401) {
-        // Retry logic for multipart
-        final _authRepository = _apiClient; // Wait, we can't easily access it. I'll ignore retry for multipart for now or just handle it if it fails.
+        final refreshed = await _apiClient.refreshToken();
+        if (refreshed) {
+          // Re-create request since streams can only be read once
+          request = http.MultipartRequest('POST', Uri.parse(baseUrl));
+          requestData.forEach((key, value) {
+            request.fields[key] = value.toString();
+          });
+          if (imageFile != null) {
+            request.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+          }
+          final newHeaders = await _apiClient.getAuthHeaders();
+          request.headers.addAll(newHeaders);
+          
+          streamedResponse = await request.send();
+          response = await http.Response.fromStream(streamedResponse);
+        }
       }
 
       if (response.statusCode == 201) {
@@ -93,6 +107,24 @@ class MaterialListingRepository {
       }
     } catch (e) {
       throw Exception('Network error while creating listing: $e');
+    }
+  }
+
+  Future<MaterialListing> updateListing(String id, Map<String, dynamic> requestData) async {
+    try {
+      final response = await _apiClient.put(
+        '$baseUrl/$id',
+        body: jsonEncode(requestData),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return MaterialListing.fromJson(data);
+      } else {
+        throw Exception('Failed to update listing: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Network error while updating listing: $e');
     }
   }
 

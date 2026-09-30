@@ -1,3 +1,5 @@
+import 'package:eco_loop/features/materials_marketplace/domain/entities/material_listing.dart';
+import 'package:eco_loop/features/materials_marketplace/presentation/pages/material_details_page.dart';
 import 'package:eco_loop/features/transactions_delivery/domain/entities/transaction_models.dart';
 import 'package:eco_loop/features/transactions_delivery/presentation/widgets/status_badge.dart';
 import 'package:flutter/material.dart';
@@ -5,6 +7,25 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:eco_loop/features/transactions_delivery/presentation/pages/location_picker_page.dart';
 
 void main() {
+  testWidgets('Start Transaction opens confirmation and quantity form', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MaterialDetailsPage(
+          listing: dummyListings.first,
+          heroTag: 'test-listing',
+        ),
+      ),
+    );
+    await tester.tap(find.text('Start Transaction'));
+    await tester.pumpAndSettle();
+    expect(find.text('Confirm Transaction'), findsOneWidget);
+    expect(find.byType(TextFormField), findsOneWidget);
+    expect(find.text('Submit Request'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'location form works without a Maps key and returns a trimmed address',
     (tester) async {

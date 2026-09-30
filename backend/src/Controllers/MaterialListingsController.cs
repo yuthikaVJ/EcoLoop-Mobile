@@ -21,9 +21,13 @@ public class MaterialListingsController : ControllerBase
         [FromQuery] string? category,
         [FromQuery] int? type,
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 10)
+        [FromQuery] int pageSize = 10,
+        [FromQuery] Guid? businessId = null,
+        [FromQuery] int status = 0)
     {
-        var result = await _listingService.GetAllAsync(search, category, type, page, pageSize);
+        if (status != 0 && (status != 1 || !businessId.HasValue))
+            return BadRequest(new { message = "Completed listings require a business ID." });
+        var result = await _listingService.GetAllAsync(search, category, type, page, pageSize, businessId, status);
         return Ok(result);
     }
 

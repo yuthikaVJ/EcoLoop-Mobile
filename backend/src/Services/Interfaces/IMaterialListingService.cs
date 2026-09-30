@@ -9,7 +9,9 @@ public interface IMaterialListingService
         string? category,
         int? type,
         int page,
-        int pageSize);
+        int pageSize,
+        Guid? businessId = null,
+        int status = 0);
 
     Task<List<MaterialListingListDto>> GetByBusinessAsync(Guid businessId);
     Task<MaterialListingDetailsDto?> GetByIdAsync(Guid id);

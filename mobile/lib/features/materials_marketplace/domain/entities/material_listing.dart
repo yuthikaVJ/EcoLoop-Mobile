@@ -1,4 +1,6 @@
 class MaterialListing {
+  final String description;
+  final String quantityValue;
   final String id;
   final String title;
   final String category;
@@ -14,10 +16,11 @@ class MaterialListing {
   final String businessId;
   final String unit;
   final bool sellerDeliveryAvailable;
-  final String description;
   final int status; // 0 = Active, 1 = Completed, 2 = Deleted
 
   MaterialListing({
+    this.description = '',
+    this.quantityValue = '',
     required this.id,
     required this.title,
     required this.category,
@@ -33,11 +36,11 @@ class MaterialListing {
     this.businessId = '11111111-1111-1111-1111-111111111111',
     this.unit = 'Tons',
     this.sellerDeliveryAvailable = false,
-    this.description = '',
     this.status = 0,
   });
 
   // Maps MaterialListingListDto / MaterialListingDetailsDto from the backend.
+  // Null-safe so one incomplete record can't crash a whole list.
   factory MaterialListing.fromJson(Map<String, dynamic> json) {
     final quantity = json['quantity']?.toString() ?? '';
     final unit = json['unit']?.toString() ?? '';
@@ -47,16 +50,17 @@ class MaterialListing {
       title: json['title']?.toString() ?? '',
       category: json['category']?.toString() ?? 'OTHER',
       quantity: unit.isEmpty ? quantity : '$quantity $unit',
+      quantityValue: quantity,
       location: json['location']?.toString() ?? '',
       companyName: seller.isEmpty ? 'Unknown Seller' : seller,
       price: (json['price'] as num?)?.toDouble() ?? 0,
       priceUnit: json['priceUnit']?.toString() ?? '',
       isVerifiedSeller: json['sellerIsVerified'] == true,
-      imageUrl: json['imageUrl']?.toString() ?? 'https://via.placeholder.com/150',
+      imageUrl: json['imageUrl']?.toString() ?? '',
       isIHave: (json['type'] as num?)?.toInt() != 1,
       datePosted:
           DateTime.tryParse(json['createdAt']?.toString() ?? '')?.toLocal() ??
-              DateTime.now(),
+          DateTime.now(),
       businessId: json['businessId']?.toString() ?? '',
       unit: unit,
       sellerDeliveryAvailable: json['sellerDeliveryAvailable'] == true,
@@ -235,5 +239,5 @@ List<MaterialListing> get dummyListings => [
     imageUrl: 'https://via.placeholder.com/150',
     isIHave: false,
     datePosted: DateTime.now().subtract(const Duration(days: 10)),
-  )
+  ),
 ];

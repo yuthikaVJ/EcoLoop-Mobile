@@ -1,20 +1,13 @@
+import '../../../../core/config/app_config.dart';
+import '../../../sustainable_products/domain/entities/product.dart';
+import '../../../materials_marketplace/domain/entities/material_listing.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../domain/entities/transaction_models.dart';
 
-class Component4Config {
-  static const apiBaseUrl = String.fromEnvironment(
-    'ECOLOOP_API_URL',
-    defaultValue: 'http://10.0.2.2:5252/api',
-  );
-
-  // Temporary Business identity until the group authentication component supplies JWT claims.
-  static const currentBusinessId = String.fromEnvironment(
-    'ECOLOOP_BUSINESS_ID',
-    defaultValue: '22222222-2222-2222-2222-222222222222',
-  );
-}
+// Compatibility alias for existing transaction screens.
+typedef Component4Config = AppConfig;
 
 class Component4ApiException implements Exception {
   final String message;
@@ -38,6 +31,88 @@ class Component4ApiService {
     this.timeout = const Duration(seconds: 20),
   }) : _client = client ?? http.Client(),
        _ownsClient = client == null;
+
+  Future<List<MaterialListing>> getMaterialListings({
+    String? businessId,
+    int status = 0,
+  }) async {
+    final listings = <MaterialListing>[];
+    var page = 1;
+    while (true) {
+      final query = Uri(
+        queryParameters: {
+          'page': '$page',
+          'pageSize': '100',
+          'status': '$status',
+          'businessId': ?businessId,
+        },
+      ).query;
+      final body = await _get('/MaterialListings?$query');
+      listings.addAll(
+        (body['items'] as List).map(
+          (item) => MaterialListing.fromJson(item as Map<String, dynamic>),
+        ),
+      );
+      if (page >= (body['totalPages'] as int)) return listings;
+      page++;
+    }
+  }
+
+  Future<List<Product>> getProducts() async {
+    final products = <Product>[];
+    var page = 1;
+    while (true) {
+      final body = await _get('/products?page=$page&pageSize=100');
+      products.addAll(
+        (body['items'] as List).map(
+          (item) => Product.fromJson(item as Map<String, dynamic>),
+        ),
+      );
+      if (page >= (body['totalPages'] as int)) return products;
+      page++;
+    }
+  }
+
+  Future<MaterialListing> saveMaterialListing({
+    String? id,
+    required Map<String, dynamic> fields,
+    List<int>? imageBytes,
+    String? imageName,
+  }) async {
+    if (id != null) {
+      return MaterialListing.fromJson(
+        await _request('PUT', '/MaterialListings/$id', fields),
+      );
+    }
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl/MaterialListings'),
+    );
+    request.fields.addAll({
+      ...fields.map((key, value) => MapEntry(key, value.toString())),
+      'businessId': AppConfig.currentBusinessId,
+    });
+    if (imageBytes != null) {
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'image',
+          imageBytes,
+          filename: imageName ?? 'listing.jpg',
+        ),
+      );
+    }
+    return MaterialListing.fromJson(await _send(request));
+  }
+
+  Future<void> changeListingStatus(String id, int status) async {
+    final request = http.Request(
+      'PATCH',
+      Uri.parse('$baseUrl/MaterialListings/$id/status'),
+    );
+    request.headers['Content-Type'] = 'application/json';
+    request.body = jsonEncode(status);
+    await _send(request);
+  }
 
   Future<List<MaterialTransactionSummary>> getMaterialTransactions({
     required bool seller,
@@ -226,12 +301,16 @@ class Component4ApiService {
     String path, [
     Map<String, dynamic>? body,
   ]) async {
+    final request = http.Request(method, Uri.parse('$baseUrl$path'));
+    if (body != null) {
+      request.headers['Content-Type'] = 'application/json';
+      request.body = jsonEncode(body);
+    }
+    return _send(request);
+  }
+
+  Future<Map<String, dynamic>> _send(http.BaseRequest request) async {
     try {
-      final request = http.Request(method, Uri.parse('$baseUrl$path'));
-      if (body != null) {
-        request.headers['Content-Type'] = 'application/json';
-        request.body = jsonEncode(body);
-      }
       final response = await (() async => http.Response.fromStream(
         await _client.send(request),
       ))().timeout(timeout);

@@ -20,7 +20,9 @@ public class MaterialListingService : IMaterialListingService
         string? category,
         int? type,
         int page,
-        int pageSize)
+        int pageSize,
+        Guid? businessId = null,
+        int status = 0)
     {
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, 100);
@@ -29,7 +31,10 @@ public class MaterialListingService : IMaterialListingService
         var query = _db.MaterialListings
             .AsNoTracking()
             .Include(listing => listing.Business)
-            .Where(listing => (int)listing.Status == 0); // Status 0 = Active
+            .Where(listing => (int)listing.Status == status);
+
+        if (businessId.HasValue)
+            query = query.Where(listing => listing.BusinessId == businessId.Value);
 
         // Apply filters
         if (!string.IsNullOrWhiteSpace(search))

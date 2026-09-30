@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../data/services/material_listing_api_service.dart';
 
 class AddMaterialPage extends StatefulWidget {
   const AddMaterialPage({super.key});
@@ -18,6 +19,66 @@ class _AddMaterialPageState extends State<AddMaterialPage> {
   String? _selectedCategory;
   String _selectedUnit = 'Tons';
   String _deliveryOption = 'Self Pickup';
+
+  final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _qtyController = TextEditingController();
+  final _priceController = TextEditingController();
+  final _locationController = TextEditingController();
+  final _api = MaterialListingApiService();
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    _qtyController.dispose();
+    _priceController.dispose();
+    _locationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    final price = double.tryParse(_priceController.text.trim());
+    if (price == null || price < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid price.')),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      await _api.createListing(
+        title: _titleController.text.trim(),
+        category: _selectedCategory!.toUpperCase(),
+        description: _descriptionController.text.trim(),
+        quantity: _qtyController.text.trim(),
+        unit: _selectedUnit,
+        location: _locationController.text.trim(),
+        price: price,
+        // 'Tons' -> 'Ton', matching the "$450/Ton" format used by the cards
+        priceUnit: _selectedUnit.endsWith('s')
+            ? _selectedUnit.substring(0, _selectedUnit.length - 1)
+            : _selectedUnit,
+        deliveryMethod: _deliveryOption,
+        isIHave: _isIHave,
+        imagePath: _images.isNotEmpty ? _images.first.path : null,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Listing posted successfully!')),
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not post listing: $e')),
+      );
+    }
+  }
 
   final List<String> _categories = [
     'Plastics', 'Paper', 'Metals', 'Glass', 'E-Waste', 'Wood', 'Other'
@@ -195,6 +256,7 @@ class _AddMaterialPageState extends State<AddMaterialPage> {
                       // Material Name
                       _buildSectionTitle('Material Name'),
                       TextFormField(
+                        controller: _titleController,
                         decoration: const InputDecoration(
                           hintText: 'e.g., Mixed High-Density Polyethylene',
                         ),
@@ -216,6 +278,7 @@ class _AddMaterialPageState extends State<AddMaterialPage> {
                       // Description
                       _buildSectionTitle('Description'),
                       TextFormField(
+                        controller: _descriptionController,
                         maxLines: 4,
                         decoration: const InputDecoration(
                           hintText: 'Describe the condition, source, etc...',
@@ -232,6 +295,7 @@ class _AddMaterialPageState extends State<AddMaterialPage> {
                               children: [
                                 _buildSectionTitle('Quantity'),
                                 TextFormField(
+                                  controller: _qtyController,
                                   keyboardType: TextInputType.number,
                                   decoration: const InputDecoration(hintText: 'e.g. 15.5'),
                                   validator: (value) => value == null || value.isEmpty ? 'Required' : null,
@@ -262,6 +326,7 @@ class _AddMaterialPageState extends State<AddMaterialPage> {
                       // Price
                       _buildSectionTitle('Price (per $_selectedUnit)'),
                       TextFormField(
+                        controller: _priceController,
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(
                           hintText: '0.00',
@@ -273,6 +338,7 @@ class _AddMaterialPageState extends State<AddMaterialPage> {
                       // Location
                       _buildSectionTitle('Location'),
                       TextFormField(
+                        controller: _locationController,
                         decoration: const InputDecoration(
                           hintText: 'Pickup address',
                           prefixIcon: Icon(Icons.location_on_outlined, color: AppColors.slateGray),
@@ -327,16 +393,14 @@ class _AddMaterialPageState extends State<AddMaterialPage> {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      // Add material logic here
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Listing posted successfully!')),
-                      );
-                      Navigator.pop(context);
-                    }
-                  },
-                  child: const Text('Post Listing', style: TextStyle(fontSize: 16)),
+                  onPressed: _isSubmitting ? null : _submit,
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.white),
+                        )
+                      : const Text('Post Listing', style: TextStyle(fontSize: 16)),
                 ),
               ),
             ),

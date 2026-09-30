@@ -10,4 +10,12 @@ public class DeliveryRoutesController(DeliveryRouteService service) : Controller
     [HttpPost]
     public async Task<IActionResult> Calculate(DeliveryRouteRequest request, CancellationToken cancellationToken) =>
         Ok(await service.CalculateAsync(request, cancellationToken));
+
+    [HttpGet("reverse")]
+    public async Task<IActionResult> Reverse([FromQuery] double lat, [FromQuery] double lng, CancellationToken cancellationToken) =>
+        Ok(await service.ReverseGeocodeAsync(lat, lng, cancellationToken));
+
+    [HttpGet("geocode")]
+    public async Task<IActionResult> Geocode([FromQuery] string q, CancellationToken cancellationToken) =>
+        Ok(await service.GeocodeAsync(q, cancellationToken));
 }

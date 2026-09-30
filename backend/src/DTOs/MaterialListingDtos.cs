@@ -38,9 +38,12 @@ public class UpdateMaterialListingRequest
 public class MaterialListingListDto
 {
     public Guid Id { get; set; }
+    public Guid BusinessId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
     public string Quantity { get; set; } = string.Empty;
+    public string Unit { get; set; } = string.Empty;
     public string Location { get; set; } = string.Empty;
     public decimal Price { get; set; }
     public string PriceUnit { get; set; } = string.Empty;

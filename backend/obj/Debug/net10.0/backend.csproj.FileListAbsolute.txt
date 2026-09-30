@@ -252,3 +252,24 @@ D:\Eco Loop mobile app\EcoLoop-Mobile\backend\obj\Debug\net10.0\swae.build.ex.ca
 D:\Eco Loop mobile app\EcoLoop-Mobile\backend\obj\Debug\net10.0\backend.csproj.Up2Date
 D:\Eco Loop mobile app\EcoLoop-Mobile\backend\obj\Debug\net10.0\backend.genruntimeconfig.cache
 D:\Eco Loop mobile app\EcoLoop-Mobile\backend\obj\Debug\net10.0\ref\backend.dll
+C:\Users\User\AppData\Local\Temp\claude\C--Users-User-Desktop-ECOLOOP\e3437d67-fa0d-4388-b7ca-e36d47c5fc8c\scratchpad\bebuild\appsettings.Development.json
+C:\Users\User\AppData\Local\Temp\claude\C--Users-User-Desktop-ECOLOOP\e3437d67-fa0d-4388-b7ca-e36d47c5fc8c\scratchpad\bebuild\appsettings.json
+C:\Users\User\AppData\Local\Temp\claude\C--Users-User-Desktop-ECOLOOP\e3437d67-fa0d-4388-b7ca-e36d47c5fc8c\scratchpad\bebuild\firebase-key.json
+C:\Users\User\AppData\Local\Temp\claude\C--Users-User-Desktop-ECOLOOP\e3437d67-fa0d-4388-b7ca-e36d47c5fc8c\scratchpad\bebuild\backend.staticwebassets.runtime.json
+C:\Users\User\AppData\Local\Temp\claude\C--Users-User-Desktop-ECOLOOP\e3437d67-fa0d-4388-b7ca-e36d47c5fc8c\scratchpad\bebuild\backend.staticwebassets.endpoints.json
+C:\Users\User\AppData\Local\Temp\claude\C--Users-User-Desktop-ECOLOOP\e3437d67-fa0d-4388-b7ca-e36d47c5fc8c\scratchpad\bebuild\backend.exe
+C:\Users\User\AppData\Local\Temp\claude\C--Users-User-Desktop-ECOLOOP\e3437d67-fa0d-4388-b7ca-e36d47c5fc8c\scratchpad\bebuild\backend.deps.json
+C:\Users\User\AppData\Local\Temp\claude\C--Users-User-Desktop-ECOLOOP\e3437d67-fa0d-4388-b7ca-e36d47c5fc8c\scratchpad\bebuild\backend.runtimeconfig.json
+C:\Users\User\AppData\Local\Temp\claude\C--Users-User-Desktop-ECOLOOP\e3437d67-fa0d-4388-b7ca-e36d47c5fc8c\scratchpad\bebuild\backend.dll
+C:\Users\User\AppData\Local\Temp\claude\C--Users-User-Desktop-ECOLOOP\e3437d67-fa0d-4388-b7ca-e36d47c5fc8c\scratchpad\bebuild\backend.pdb
+C:\Users\User\Desktop\ECOLOOP\backend\bin\Debug\net10.0\firebase-key.json
+C:\Users\User\AppData\Local\Temp\claude\C--Users-User-Desktop-ECOLOOP\5fbcdb23-6ea4-475f-b5f8-c5f885118c32\scratchpad\build\appsettings.Development.json
+C:\Users\User\AppData\Local\Temp\claude\C--Users-User-Desktop-ECOLOOP\5fbcdb23-6ea4-475f-b5f8-c5f885118c32\scratchpad\build\appsettings.json
+C:\Users\User\AppData\Local\Temp\claude\C--Users-User-Desktop-ECOLOOP\5fbcdb23-6ea4-475f-b5f8-c5f885118c32\scratchpad\build\firebase-key.json
+C:\Users\User\AppData\Local\Temp\claude\C--Users-User-Desktop-ECOLOOP\5fbcdb23-6ea4-475f-b5f8-c5f885118c32\scratchpad\build\backend.staticwebassets.runtime.json
+C:\Users\User\AppData\Local\Temp\claude\C--Users-User-Desktop-ECOLOOP\5fbcdb23-6ea4-475f-b5f8-c5f885118c32\scratchpad\build\backend.staticwebassets.endpoints.json
+C:\Users\User\AppData\Local\Temp\claude\C--Users-User-Desktop-ECOLOOP\5fbcdb23-6ea4-475f-b5f8-c5f885118c32\scratchpad\build\backend.exe
+C:\Users\User\AppData\Local\Temp\claude\C--Users-User-Desktop-ECOLOOP\5fbcdb23-6ea4-475f-b5f8-c5f885118c32\scratchpad\build\backend.deps.json
+C:\Users\User\AppData\Local\Temp\claude\C--Users-User-Desktop-ECOLOOP\5fbcdb23-6ea4-475f-b5f8-c5f885118c32\scratchpad\build\backend.runtimeconfig.json
+C:\Users\User\AppData\Local\Temp\claude\C--Users-User-Desktop-ECOLOOP\5fbcdb23-6ea4-475f-b5f8-c5f885118c32\scratchpad\build\backend.dll
+C:\Users\User\AppData\Local\Temp\claude\C--Users-User-Desktop-ECOLOOP\5fbcdb23-6ea4-475f-b5f8-c5f885118c32\scratchpad\build\backend.pdb

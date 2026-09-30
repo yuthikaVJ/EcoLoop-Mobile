@@ -14,6 +14,8 @@ class MaterialListing {
   final String businessId;
   final String unit;
   final bool sellerDeliveryAvailable;
+  final String description;
+  final int status; // 0 = Active, 1 = Completed, 2 = Deleted
 
   MaterialListing({
     required this.id,
@@ -31,7 +33,37 @@ class MaterialListing {
     this.businessId = '11111111-1111-1111-1111-111111111111',
     this.unit = 'Tons',
     this.sellerDeliveryAvailable = false,
+    this.description = '',
+    this.status = 0,
   });
+
+  // Maps MaterialListingListDto / MaterialListingDetailsDto from the backend.
+  factory MaterialListing.fromJson(Map<String, dynamic> json) {
+    final quantity = json['quantity']?.toString() ?? '';
+    final unit = json['unit']?.toString() ?? '';
+    final seller = json['seller']?.toString() ?? '';
+    return MaterialListing(
+      id: json['id'].toString(),
+      title: json['title']?.toString() ?? '',
+      category: json['category']?.toString() ?? 'OTHER',
+      quantity: unit.isEmpty ? quantity : '$quantity $unit',
+      location: json['location']?.toString() ?? '',
+      companyName: seller.isEmpty ? 'Unknown Seller' : seller,
+      price: (json['price'] as num?)?.toDouble() ?? 0,
+      priceUnit: json['priceUnit']?.toString() ?? '',
+      isVerifiedSeller: json['sellerIsVerified'] == true,
+      imageUrl: json['imageUrl']?.toString() ?? 'https://via.placeholder.com/150',
+      isIHave: (json['type'] as num?)?.toInt() != 1,
+      datePosted:
+          DateTime.tryParse(json['createdAt']?.toString() ?? '')?.toLocal() ??
+              DateTime.now(),
+      businessId: json['businessId']?.toString() ?? '',
+      unit: unit,
+      sellerDeliveryAvailable: json['sellerDeliveryAvailable'] == true,
+      description: json['description']?.toString() ?? '',
+      status: (json['status'] as num?)?.toInt() ?? 0,
+    );
+  }
 }
 
 // Dummy data for development

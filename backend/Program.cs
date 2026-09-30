@@ -19,7 +19,12 @@ builder.Services.AddScoped<IMaterialListingService, MaterialListingService>();
 builder.Services.AddScoped<IMaterialTransactionService, MaterialTransactionService>();
 builder.Services.AddScoped<IProductOrderService, ProductOrderService>();
 builder.Services.AddScoped<DeliveryLocationService>();
-builder.Services.AddHttpClient<DeliveryRouteService>(client => client.Timeout = TimeSpan.FromSeconds(15));
+builder.Services.AddHttpClient<DeliveryRouteService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(15);
+    // Nominatim's usage policy rejects requests without an identifying User-Agent.
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("EcoLoop/1.0 (student project)");
+});
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -50,6 +55,8 @@ app.MapControllers();
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<EcoLoopDbContext>();
+    // Apply any pending migrations so the database schema always matches the models.
+    context.Database.Migrate();
     var dummyBusinessId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     if (!context.Businesses.Any(b => b.Id == dummyBusinessId))
     {

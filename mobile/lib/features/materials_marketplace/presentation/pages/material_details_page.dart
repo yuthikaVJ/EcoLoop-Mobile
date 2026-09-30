@@ -8,6 +8,9 @@ class MaterialDetailsPage extends StatelessWidget {
   final MaterialListing listing;
   final String heroTag;
 
+  // Narrower than the theme's 24px so both labels fit side by side on small phones.
+  static const _actionButtonPadding = EdgeInsets.symmetric(horizontal: 8, vertical: 16);
+
   const MaterialDetailsPage({
     super.key,
     required this.listing,
@@ -77,17 +80,20 @@ class MaterialDetailsPage extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.mintGreen,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          listing.category,
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: AppColors.forestGreen,
-                            fontWeight: FontWeight.bold,
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.mintGreen,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            listing.category,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: AppColors.forestGreen,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
@@ -152,7 +158,9 @@ class MaterialDetailsPage extends StatelessWidget {
                   const Text('Description', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                   const SizedBox(height: 12),
                   Text(
-                    'This is a placeholder description for ${listing.title}. Here the seller would provide detailed information regarding the quality, exact condition, and any other relevant specifics about the material being offered or requested.',
+                    listing.description.isNotEmpty
+                        ? listing.description
+                        : 'No description provided.',
                     style: const TextStyle(height: 1.5, color: AppColors.slateGray),
                   ),
                   const SizedBox(height: 24),
@@ -169,7 +177,11 @@ class MaterialDetailsPage extends StatelessWidget {
                         style: const TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.bold),
                       ),
                     ),
-                    title: Text(listing.companyName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    title: Text(
+                      listing.companyName,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     subtitle: const Text('Member since 2024 • 4.8 Rating'),
                     trailing: const Icon(Icons.chevron_right),
                   ),
@@ -193,22 +205,27 @@ class MaterialDetailsPage extends StatelessWidget {
             )
           ],
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatPage(listing: listing))),
-                child: const Text('Contact Seller'),
+        child: SafeArea(
+          top: false,
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(padding: _actionButtonPadding),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatPage(listing: listing))),
+                  child: const Text('Contact Seller'),
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ConfirmMaterialTransactionPage(listing: listing))),
-                child: const Text('Start Transaction'),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(padding: _actionButtonPadding),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ConfirmMaterialTransactionPage(listing: listing))),
+                  child: const Text('Start Transaction'),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -216,12 +233,20 @@ class MaterialDetailsPage extends StatelessWidget {
 
   Widget _buildSpecRow(IconData icon, String label, String value) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, color: AppColors.ecoGreen, size: 20),
         const SizedBox(width: 12),
         Text(label, style: const TextStyle(color: AppColors.slateGray)),
-        const Spacer(),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(width: 16),
+        // Expanded lets long values (e.g. full addresses) wrap instead of overflowing
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
       ],
     );
   }

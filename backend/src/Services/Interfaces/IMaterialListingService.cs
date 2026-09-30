@@ -11,6 +11,7 @@ public interface IMaterialListingService
         int page,
         int pageSize);
 
+    Task<List<MaterialListingListDto>> GetByBusinessAsync(Guid businessId);
     Task<MaterialListingDetailsDto?> GetByIdAsync(Guid id);
     Task<MaterialListingDetailsDto> CreateAsync(CreateMaterialListingRequest request);
     Task<MaterialListingDetailsDto?> UpdateAsync(Guid id, UpdateMaterialListingRequest request);

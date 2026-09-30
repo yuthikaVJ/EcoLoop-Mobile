@@ -27,6 +27,13 @@ public class MaterialListingsController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("business/{businessId:guid}")]
+    public async Task<IActionResult> GetByBusiness(Guid businessId)
+    {
+        var items = await _listingService.GetByBusinessAsync(businessId);
+        return Ok(new { items });
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
     {

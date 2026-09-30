@@ -2,6 +2,7 @@ using EcoLoop.Api.Data;
 using EcoLoop.Api.DTOs;
 using EcoLoop.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
 
 namespace EcoLoop.Api.Services;
 
@@ -54,23 +55,7 @@ public class MaterialListingService : IMaterialListingService
         var items = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(listing => new MaterialListingListDto
-            {
-                Id = listing.Id,
-                Title = listing.Title,
-                Category = listing.Category,
-                Quantity = listing.Quantity,
-                Location = listing.Location,
-                Price = listing.Price,
-                PriceUnit = listing.PriceUnit,
-                Seller = listing.Business != null ? listing.Business.BusinessName : null,
-                SellerIsVerified = listing.Business != null && listing.Business.IsVerified,
-                Type = (int)listing.Type,
-                Status = (int)listing.Status,
-                CreatedAt = listing.CreatedAt,
-                ImageUrl = listing.ImageUrl,
-                SellerDeliveryAvailable = listing.SellerDeliveryAvailable
-            })
+            .Select(ToListDto)
             .ToListAsync();
 
         return new
@@ -82,6 +67,41 @@ public class MaterialListingService : IMaterialListingService
             totalPages = (int)Math.Ceiling((double)totalItems / pageSize)
         };
     }
+
+    // Active and completed listings owned by one business (for "My Listings")
+    public async Task<List<MaterialListingListDto>> GetByBusinessAsync(Guid businessId)
+    {
+        return await _db.MaterialListings
+            .AsNoTracking()
+            .Include(listing => listing.Business)
+            .Where(listing => listing.BusinessId == businessId &&
+                              listing.Status != EcoLoop.Api.Models.ListingStatus.Deleted)
+            .OrderByDescending(listing => listing.CreatedAt)
+            .Select(ToListDto)
+            .ToListAsync();
+    }
+
+    private static readonly Expression<Func<EcoLoop.Api.Models.MaterialListing, MaterialListingListDto>> ToListDto =
+        listing => new MaterialListingListDto
+        {
+            Id = listing.Id,
+            BusinessId = listing.BusinessId,
+            Title = listing.Title,
+            Category = listing.Category,
+            Description = listing.Description,
+            Quantity = listing.Quantity,
+            Unit = listing.Unit,
+            Location = listing.Location,
+            Price = listing.Price,
+            PriceUnit = listing.PriceUnit,
+            Seller = listing.Business != null ? listing.Business.BusinessName : null,
+            SellerIsVerified = listing.Business != null && listing.Business.IsVerified,
+            Type = (int)listing.Type,
+            Status = (int)listing.Status,
+            CreatedAt = listing.CreatedAt,
+            ImageUrl = listing.ImageUrl,
+            SellerDeliveryAvailable = listing.SellerDeliveryAvailable
+        };
 
     public async Task<MaterialListingDetailsDto?> GetByIdAsync(Guid id)
     {

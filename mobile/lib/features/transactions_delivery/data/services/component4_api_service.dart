@@ -201,6 +201,22 @@ class Component4ApiService {
   Future<Map<String, dynamic>> getRoute(String origin, String destination) =>
       _post('/delivery-routes', {'origin': origin, 'destination': destination});
 
+  /// Place name for a coordinate, e.g. "Galle Road, Kollupitiya, Colombo, ...".
+  Future<String> reverseGeocode(double lat, double lng) async {
+    final json = await _get(
+      '/delivery-routes/reverse?lat=${lat.toStringAsFixed(6)}&lng=${lng.toStringAsFixed(6)}',
+    );
+    return json['name'] as String;
+  }
+
+  /// Coordinates for a place name, as `(lat, lng)`.
+  Future<(double, double)> geocode(String query) async {
+    final json = await _get(
+      '/delivery-routes/geocode?q=${Uri.encodeQueryComponent(query)}',
+    );
+    return ((json['lat'] as num).toDouble(), (json['lng'] as num).toDouble());
+  }
+
   Future<Map<String, dynamic>> _get(String path) => _request('GET', path);
   Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> body) =>
       _request('POST', path, body);

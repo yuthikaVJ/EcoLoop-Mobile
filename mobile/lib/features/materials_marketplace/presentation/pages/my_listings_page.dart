@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../data/services/material_listing_api_service.dart';
 import '../../domain/entities/material_listing.dart';
 import '../widgets/my_listing_card.dart';
 
@@ -12,19 +13,48 @@ class MyListingsPage extends StatefulWidget {
 
 class _MyListingsPageState extends State<MyListingsPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  
-  // Using dummy data to simulate the user's listings
-  late List<MaterialListing> _activeListings;
-  late List<MaterialListing> _completedListings;
+  final _api = MaterialListingApiService();
+
+  List<MaterialListing> _activeListings = [];
+  List<MaterialListing> _completedListings = [];
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    
-    // Initialize dummy data state
-    _activeListings = dummyListings.take(4).toList();
-    _completedListings = dummyListings.skip(4).take(2).toList();
+    _loadListings();
+  }
+
+  Future<void> _loadListings() async {
+    setState(() => _error = null);
+    try {
+      final listings = await _api.getMyListings();
+      if (!mounted) return;
+      setState(() {
+        _activeListings = listings.where((l) => l.status == 0).toList();
+        _completedListings = listings.where((l) => l.status == 1).toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _changeStatus(MaterialListing listing, int status, String successMessage) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await _api.changeStatus(listing.id, status);
+      messenger.showSnackBar(SnackBar(content: Text(successMessage)));
+      await _loadListings();
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Could not update listing: $e')));
+    }
   }
 
   @override
@@ -47,17 +77,8 @@ class _MyListingsPageState extends State<MyListingsPage> with SingleTickerProvid
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
             onPressed: () {
-              setState(() {
-                if (isActive) {
-                  _activeListings.remove(listing);
-                } else {
-                  _completedListings.remove(listing);
-                }
-              });
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Listing deleted')),
-              );
+              _changeStatus(listing, 2, 'Listing deleted');
             },
             child: const Text('Delete'),
           ),
@@ -67,13 +88,7 @@ class _MyListingsPageState extends State<MyListingsPage> with SingleTickerProvid
   }
 
   void _markAsSold(MaterialListing listing) {
-    setState(() {
-      _activeListings.remove(listing);
-      _completedListings.insert(0, listing);
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Listing marked as completed')),
-    );
+    _changeStatus(listing, 1, 'Listing marked as completed');
   }
 
   @override
@@ -92,13 +107,33 @@ class _MyListingsPageState extends State<MyListingsPage> with SingleTickerProvid
           ],
         ),
       ),
-      body: TabBarView(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: AppColors.forestGreen))
+          : _error != null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.slateGray)),
+                    const SizedBox(height: 12),
+                    ElevatedButton(onPressed: _loadListings, child: const Text('Retry')),
+                  ],
+                ),
+              ),
+            )
+          : TabBarView(
         controller: _tabController,
         children: [
           // Active Tab
-          _activeListings.isEmpty
+          RefreshIndicator(
+            color: AppColors.forestGreen,
+            onRefresh: _loadListings,
+            child: _activeListings.isEmpty
               ? _buildEmptyState('You have no active listings.')
               : ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.only(top: 8, bottom: 80),
                   itemCount: _activeListings.length,
                   itemBuilder: (context, index) {
@@ -113,11 +148,16 @@ class _MyListingsPageState extends State<MyListingsPage> with SingleTickerProvid
                     );
                   },
                 ),
+          ),
                 
           // Completed Tab
-          _completedListings.isEmpty
+          RefreshIndicator(
+            color: AppColors.forestGreen,
+            onRefresh: _loadListings,
+            child: _completedListings.isEmpty
               ? _buildEmptyState('You have no completed listings.')
               : ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.only(top: 8, bottom: 80),
                   itemCount: _completedListings.length,
                   itemBuilder: (context, index) {
@@ -129,12 +169,25 @@ class _MyListingsPageState extends State<MyListingsPage> with SingleTickerProvid
                     );
                   },
                 ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildEmptyState(String message) {
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: _buildEmptyMessage(message),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyMessage(String message) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

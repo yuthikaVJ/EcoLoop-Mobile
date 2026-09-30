@@ -13,13 +13,8 @@ flutter run --dart-define=ECOLOOP_API_URL=http://10.0.2.2:5252/api \
 `ECOLOOP_BUSINESS_ID` is a temporary integration point until the team's JWT
 authentication feature supplies the current business from authenticated claims.
 
-Google Maps keys are intentionally not stored in source control:
-
-- Android: set the `GOOGLE_MAPS_API_KEY` environment variable before building.
-- iOS: define `GOOGLE_MAPS_API_KEY` in the local Xcode build configuration.
-
-The location form remains usable as an address/coordinate field, but Google map
-tiles require a valid key with the Maps SDK enabled for the target platform.
+The location screen uses `flutter_map` with free OpenStreetMap tiles, so no map
+API key or billing account is needed. Tiles only need an internet connection.
 
 ## Component 4 additions — 24 September 2026
 
@@ -58,21 +53,21 @@ migration tooling. No existing order/listing records are rewritten by this migra
 
 ### Maps and route configuration
 
-Without a native map key, the location screen supports text/GPS without constructing
-the native map. After configuring the platform key, build with:
+The map is OpenStreetMap (via `flutter_map`) and needs no key.
 
-```text
---dart-define=ECOLOOP_MAPS_ENABLED=true
-```
+For driving distance, duration and a route polyline, the backend geocodes typed
+addresses with OpenStreetMap Nominatim and routes with OSRM. Both are free and need
+no key; coordinates (`lat, lng`) skip the geocoding step. The location screen's
+“Driving distance from me” action uses current GPS as origin and the
+entered/selected location as destination. This is a driving estimate, not live
+delivery tracking.
 
-For driving distance, duration and a route polyline, configure the backend environment
-variable `GoogleMaps__RoutesApiKey` with a server key enabled for Google Routes API.
-The backend calls Google; this server key is never sent to Flutter. The location
-screen's “Driving distance from me” action explicitly uses current GPS as origin
-and the entered/selected location as destination. This is a driving estimate, not
-live delivery tracking. Missing configuration returns 503 with a useful message.
+The public servers are rate-limited and meant for light use (Nominatim allows about
+one request per second). To point at self-hosted instances, set
+`Routing__NominatimBaseUrl` / `Routing__OsrmBaseUrl` on the backend.
 
-Provider contract: https://developers.google.com/maps/documentation/routes/compute_route_directions
+Provider docs: https://project-osrm.org/docs/v5.24.0/api/ and
+https://nominatim.org/release-docs/latest/api/Search/
 
 ### New endpoints
 

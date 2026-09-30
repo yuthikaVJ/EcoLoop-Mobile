@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../data/services/material_listing_api_service.dart';
 import '../../domain/entities/material_listing.dart';
 import '../widgets/featured_material_card.dart';
 import '../widgets/grid_material_card.dart';
@@ -18,10 +19,15 @@ class _MaterialsMarketplacePageState extends State<MaterialsMarketplacePage> wit
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  final _api = MaterialListingApiService();
+  List<MaterialListing> _allListings = [];
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
+    _loadListings();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
@@ -41,10 +47,31 @@ class _MaterialsMarketplacePageState extends State<MaterialsMarketplacePage> wit
     super.dispose();
   }
 
+  Future<void> _loadListings() async {
+    setState(() {
+      _isLoading = _allListings.isEmpty;
+      _error = null;
+    });
+    try {
+      final listings = await _api.getListings();
+      if (!mounted) return;
+      setState(() {
+        _allListings = listings;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
   List<MaterialListing> _getFilteredListings() {
     final bool isIHaveTab = _tabController.index == 0;
     
-    return dummyListings.where((listing) {
+    return _allListings.where((listing) {
       // 1. Filter by active tab
       if (listing.isIHave != isIHaveTab) return false;
       
@@ -79,7 +106,7 @@ class _MaterialsMarketplacePageState extends State<MaterialsMarketplacePage> wit
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const MyListingsPage()),
-              );
+              ).then((_) => _loadListings());
             },
           ),
         ],
@@ -128,13 +155,42 @@ class _MaterialsMarketplacePageState extends State<MaterialsMarketplacePage> wit
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
-              child: listings.isEmpty
+              child: _isLoading
                   ? const Center(
-                      key: ValueKey('empty'),
-                      child: Text('No materials found.'),
+                      key: ValueKey('loading'),
+                      child: CircularProgressIndicator(color: AppColors.forestGreen),
+                    )
+                  : _error != null && _allListings.isEmpty
+                  ? Center(
+                      key: const ValueKey('error'),
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.slateGray)),
+                            const SizedBox(height: 12),
+                            ElevatedButton(onPressed: _loadListings, child: const Text('Retry')),
+                          ],
+                        ),
+                      ),
+                    )
+                  : RefreshIndicator(
+                      key: ValueKey('list_${_tabController.index}_${isSearching ? "search" : "default"}'),
+                      color: AppColors.forestGreen,
+                      onRefresh: _loadListings,
+                      child: listings.isEmpty
+                  ? const CustomScrollView(
+                      physics: AlwaysScrollableScrollPhysics(),
+                      slivers: [
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Center(child: Text('No materials found.')),
+                        ),
+                      ],
                     )
                   : CustomScrollView(
-                      key: ValueKey('list_${_tabController.index}_${isSearching ? "search" : "default"}'),
+                      physics: const AlwaysScrollableScrollPhysics(),
                       slivers: [
                         // Featured Carousel
                         if (featuredListings.isNotEmpty)
@@ -249,6 +305,7 @@ class _MaterialsMarketplacePageState extends State<MaterialsMarketplacePage> wit
                           const SliverToBoxAdapter(child: SizedBox(height: 80)),
                       ],
                     ),
+                    ),
             ),
           ),
         ],
@@ -281,7 +338,9 @@ class _MaterialsMarketplacePageState extends State<MaterialsMarketplacePage> wit
               },
               transitionDuration: const Duration(milliseconds: 400),
             ),
-          );
+          ).then((posted) {
+            if (posted == true) _loadListings();
+          });
         },
       ),
     );

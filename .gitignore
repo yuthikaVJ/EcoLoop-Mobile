@@ -1,0 +1,9 @@
+figma/
+EcoLoop_Corrected_Project_Document.pdf/
+appsettings.Development.json
+.env
+firebase-key.json
+google-services.json
+# .NET Build Output
+bin/
+obj/

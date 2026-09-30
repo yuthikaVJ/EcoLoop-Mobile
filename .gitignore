@@ -59,3 +59,4 @@ backend/wwwroot/uploads/
 .DS_Store
 Thumbs.db
 Desktop.ini
+backend/firebase-key.json

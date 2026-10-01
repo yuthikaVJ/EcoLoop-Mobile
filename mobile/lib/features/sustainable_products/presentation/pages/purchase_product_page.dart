@@ -3,7 +3,12 @@ import '../../domain/entities/product.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../widgets/product_image_widget.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/product_repository.dart';
+import '../../../transactions_delivery/data/services/component4_api_service.dart';
+import '../../../transactions_delivery/domain/entities/transaction_models.dart';
+import '../../../transactions_delivery/presentation/pages/location_picker_page.dart';
+import '../../../transactions_delivery/presentation/pages/saved_locations_page.dart';
+import '../../../transactions_delivery/presentation/pages/transaction_detail_page.dart';
+import '../../../transactions_delivery/presentation/widgets/delivery_method_selector.dart';
 import 'payment_page.dart';
 
 class PurchaseProductPage extends ConsumerStatefulWidget {
@@ -20,9 +25,12 @@ class PurchaseProductPage extends ConsumerStatefulWidget {
 
 class _PurchaseProductPageState extends ConsumerState<PurchaseProductPage> {
   int _quantity = 1;
-  final _addressController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isProcessing = false;
+  final _api = Component4ApiService();
+  // Seller Delivery is only offered when the seller enabled it for this product.
+  DeliveryMethod _method = DeliveryMethod.selfPickup;
+  String? _location;
 
   void _increment() {
     if (_quantity < widget.product.availableQuantity) {
@@ -38,7 +46,13 @@ class _PurchaseProductPageState extends ConsumerState<PurchaseProductPage> {
 
   void _processPurchase() async {
     if (!_formKey.currentState!.validate()) return;
-    
+    if (_method == DeliveryMethod.sellerDelivery && _location == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Choose where the seller should deliver.')),
+      );
+      return;
+    }
+
     final totalPrice = widget.product.price * _quantity;
     
     // Navigate to payment page
@@ -53,13 +67,18 @@ class _PurchaseProductPageState extends ConsumerState<PurchaseProductPage> {
     setState(() => _isProcessing = true);
     
     try {
-      await ref.read(productRepositoryProvider).purchaseProduct(
-        widget.product.id,
-        _quantity,
+      // A product order (not a bare stock decrement) so the seller can confirm,
+      // prepare and deliver it, and both sides can track it in Orders.
+      final order = await _api.createProductOrder(
+        items: [
+          {'productId': widget.product.id, 'quantity': _quantity},
+        ],
+        method: _method,
+        location: _method == DeliveryMethod.sellerDelivery ? _location : null,
       );
-      
+
       if (!mounted) return;
-      
+
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -73,13 +92,29 @@ class _PurchaseProductPageState extends ConsumerState<PurchaseProductPage> {
             ],
           ),
           content: Text(
-            'You have successfully purchased $_quantity x ${widget.product.name}. Your impact matters!',
+            _method == DeliveryMethod.sellerDelivery
+                ? 'You ordered $_quantity x ${widget.product.name}. The seller will deliver it; follow it in Orders.'
+                : 'You ordered $_quantity x ${widget.product.name}. You\'ll collect it from the seller; follow it in Orders.',
             textAlign: TextAlign.center,
           ),
           actions: [
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // pop dialog
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (_) => TransactionDetailPage(id: order.id, order: true),
+                    ),
+                  );
+                },
+                child: const Text('Track Order'),
+              ),
+            ),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
                 onPressed: () {
                   Navigator.of(context).pop(); // pop dialog
                   Navigator.of(context).pop(true); // pop purchase screen with true
@@ -198,27 +233,41 @@ class _PurchaseProductPageState extends ConsumerState<PurchaseProductPage> {
               ),
               const SizedBox(height: 32),
 
-              // Shipping Details
-              const Text('Shipping Address', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              // Delivery: Self Pickup, or Seller Delivery when the seller offers it
+              const Text('Delivery', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 12),
-              TextFormField(
-                controller: _addressController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: 'Enter your full shipping address',
-                  fillColor: AppColors.white,
-                  filled: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a shipping address';
-                  }
-                  return null;
-                },
+                child: Column(
+                  children: [
+                    DeliveryMethodSelector(
+                      value: _method,
+                      sellerDeliveryAvailable: widget.product.sellerDeliveryAvailable,
+                      onChanged: (value) => setState(() => _method = value),
+                    ),
+                    if (_method == DeliveryMethod.sellerDelivery) ...[
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.location_on_outlined),
+                        title: Text(_location ?? 'Choose delivery location'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => _pickLocation(
+                          LocationPickerPage(initialLocation: _location),
+                        ),
+                      ),
+                      TextButton.icon(
+                        icon: const Icon(Icons.bookmark_outline),
+                        label: const Text('Use a saved location'),
+                        onPressed: () => _pickLocation(
+                          const SavedLocationsPage(select: true),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
               const SizedBox(height: 40),
 
@@ -276,9 +325,17 @@ class _PurchaseProductPageState extends ConsumerState<PurchaseProductPage> {
     );
   }
 
+  Future<void> _pickLocation(Widget page) async {
+    final value = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => page),
+    );
+    if (value != null && mounted) setState(() => _location = value);
+  }
+
   @override
   void dispose() {
-    _addressController.dispose();
+    _api.dispose();
     super.dispose();
   }
 }

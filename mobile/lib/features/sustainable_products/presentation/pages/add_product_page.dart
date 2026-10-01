@@ -28,6 +28,7 @@ class _AddProductPageState extends ConsumerState<AddProductPage> {
   String? _selectedCategoryId;
   bool _loadingCategories = true;
   bool _submitting = false;
+  bool _sellerDelivery = false;
 
   final ImagePicker _picker = ImagePicker();
   final List<XFile> _images = [];
@@ -163,6 +164,7 @@ class _AddProductPageState extends ConsumerState<AddProductPage> {
         'materialType': _materialController.text.trim(),
         'price': double.parse(_priceController.text.trim()),
         'availableQuantity': int.parse(_stockController.text.trim()),
+        'sellerDeliveryAvailable': _sellerDelivery,
       });
 
       final productResponse = await apiClient.post('/api/products', body: productBody);
@@ -437,6 +439,16 @@ class _AddProductPageState extends ConsumerState<AddProductPage> {
                 if (qty < 0) return 'Quantity cannot be negative';
                 return null;
               },
+            ),
+            const SizedBox(height: 20),
+
+            // ── Delivery ────────────────────────────────────────
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Seller delivery available'),
+              subtitle: const Text('You deliver it yourself; buyers can still choose self pickup.'),
+              value: _sellerDelivery,
+              onChanged: (value) => setState(() => _sellerDelivery = value),
             ),
             const SizedBox(height: 20),
 

@@ -45,6 +45,10 @@ dependencies:
   firebase_core: ^4.15.0
   firebase_messaging: ^16.7.0
   flutter_local_notifications: ^22.3.1
+  # Delivery: GPS + free OpenStreetMap map (no API key)
+  geolocator: ^14.0.2
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
 
 dev_dependencies:
   flutter_test:

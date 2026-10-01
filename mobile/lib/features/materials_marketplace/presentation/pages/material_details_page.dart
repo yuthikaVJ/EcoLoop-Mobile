@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/config/app_config.dart';
 import '../../domain/entities/material_listing.dart';
+import '../../../transactions_delivery/presentation/pages/confirm_material_transaction_page.dart';
 import 'chat_page.dart';
 
 class MaterialDetailsPage extends StatelessWidget {
@@ -82,17 +84,20 @@ class MaterialDetailsPage extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.mintGreen,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          listing.category,
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: AppColors.forestGreen,
-                            fontWeight: FontWeight.bold,
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.mintGreen,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            listing.category,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: AppColors.forestGreen,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
@@ -141,11 +146,15 @@ class MaterialDetailsPage extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
-                        _buildSpecRow(Icons.inventory_2_outlined, 'Quantity', listing.quantity),
+                        _buildSpecRow(Icons.inventory_2_outlined, 'Quantity', '${listing.quantity} ${listing.unit}'.trim()),
                         const SizedBox(height: 20),
                         _buildSpecRow(Icons.location_on_outlined, 'Location', listing.location),
                         const SizedBox(height: 20),
-                        _buildSpecRow(Icons.local_shipping_outlined, 'Delivery', 'Seller Delivery / Self Pickup'),
+                        _buildSpecRow(
+                          Icons.local_shipping_outlined,
+                          'Delivery',
+                          listing.sellerDeliveryAvailable ? 'Self Pickup / Seller Delivery' : 'Self Pickup only',
+                        ),
                         const SizedBox(height: 20),
                         _buildSpecRow(Icons.access_time_outlined, 'Date Posted', _formatDate(listing.datePosted)),
                       ],
@@ -157,7 +166,7 @@ class MaterialDetailsPage extends StatelessWidget {
                   const Text('Description', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                   const SizedBox(height: 12),
                   Text(
-                    'This is a placeholder description for ${listing.title}. Here the seller would provide detailed information regarding the quality, exact condition, and any other relevant specifics about the material being offered or requested.',
+                    listing.description.isNotEmpty ? listing.description : 'No description provided.',
                     style: const TextStyle(height: 1.5, color: AppColors.slateGray),
                   ),
                   const SizedBox(height: 24),
@@ -174,7 +183,11 @@ class MaterialDetailsPage extends StatelessWidget {
                         style: const TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.bold),
                       ),
                     ),
-                    title: Text(listing.companyName ?? 'Unknown Company', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    title: Text(
+                      listing.companyName ?? 'Unknown Company',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     subtitle: const Text('Member since 2024 • 4.8 Rating'),
                     trailing: const Icon(Icons.chevron_right),
                   ),
@@ -198,25 +211,57 @@ class MaterialDetailsPage extends StatelessWidget {
             )
           ],
         ),
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.forestGreen,
-            padding: const EdgeInsets.symmetric(vertical: 16),
+        child: SafeArea(
+          top: false,
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(padding: _actionButtonPadding),
+                  onPressed: isOwnListing
+                      ? null
+                      : () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => ChatPage(
+                              listing: listing,
+                              receiverId: listing.businessId ?? '',
+                            )),
+                          ),
+                  child: const Text('Contact Seller'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.forestGreen,
+                    padding: _actionButtonPadding,
+                  ),
+                  // Component 4: buy (I Have) or offer to supply (I Need), choosing
+                  // Self Pickup or Seller Delivery when the seller offers it.
+                  onPressed: isOwnListing
+                      ? null
+                      : () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => ConfirmMaterialTransactionPage(listing: listing)),
+                          ),
+                  child: Text(
+                    isOwnListing ? 'Your Listing' : listing.isIHave ? 'Start Transaction' : 'Offer to Supply',
+                    style: const TextStyle(color: AppColors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
           ),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => ChatPage(
-                listing: listing,
-                receiverId: listing.businessId ?? '',
-              )),
-            );
-          },
-          child: const Text('Contact Seller', style: TextStyle(fontSize: 16, color: AppColors.white, fontWeight: FontWeight.bold)),
         ),
       ),
     );
   }
+
+  bool get isOwnListing => listing.businessId != null && listing.businessId == AppConfig.currentBusinessId;
+
+  // Narrower than the theme's padding so both labels fit side by side on small phones.
+  static const _actionButtonPadding = EdgeInsets.symmetric(horizontal: 8, vertical: 16);
 
   Widget _buildSpecRow(IconData icon, String label, String value) {
     return Row(

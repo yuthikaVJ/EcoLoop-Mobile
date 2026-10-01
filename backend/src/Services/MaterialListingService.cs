@@ -2,6 +2,7 @@ using EcoLoop.Api.Data;
 using EcoLoop.Api.DTOs;
 using EcoLoop.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
 
 namespace EcoLoop.Api.Services;
 
@@ -19,7 +20,9 @@ public class MaterialListingService : IMaterialListingService
         string? category,
         int? type,
         int page,
-        int pageSize)
+        int pageSize,
+        Guid? businessId = null,
+        int status = 0)
     {
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, 100);
@@ -28,7 +31,10 @@ public class MaterialListingService : IMaterialListingService
         var query = _db.MaterialListings
             .AsNoTracking()
             .Include(listing => listing.Business)
-            .Where(listing => (int)listing.Status == 0); // Status 0 = Active
+            .Where(listing => (int)listing.Status == status);
+
+        if (businessId.HasValue)
+            query = query.Where(listing => listing.BusinessId == businessId.Value);
 
         // Apply filters
         if (!string.IsNullOrWhiteSpace(search))
@@ -54,22 +60,7 @@ public class MaterialListingService : IMaterialListingService
         var items = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(listing => new MaterialListingListDto
-            {
-                Id = listing.Id,
-                Title = listing.Title,
-                Category = listing.Category,
-                Quantity = listing.Quantity,
-                Location = listing.Location,
-                Price = listing.Price,
-                PriceUnit = listing.PriceUnit,
-                Seller = listing.Business != null ? listing.Business.BusinessName : null,
-                SellerIsVerified = listing.Business != null && listing.Business.IsVerified,
-                Type = (int)listing.Type,
-                Status = (int)listing.Status,
-                CreatedAt = listing.CreatedAt,
-                ImageUrl = listing.ImageUrl
-            })
+            .Select(ToListDto)
             .ToListAsync();
 
         return new
@@ -81,6 +72,41 @@ public class MaterialListingService : IMaterialListingService
             totalPages = (int)Math.Ceiling((double)totalItems / pageSize)
         };
     }
+
+    // Active and completed listings owned by one business (for "My Listings")
+    public async Task<List<MaterialListingListDto>> GetByBusinessAsync(Guid businessId)
+    {
+        return await _db.MaterialListings
+            .AsNoTracking()
+            .Include(listing => listing.Business)
+            .Where(listing => listing.BusinessId == businessId &&
+                              listing.Status != EcoLoop.Api.Models.ListingStatus.Deleted)
+            .OrderByDescending(listing => listing.CreatedAt)
+            .Select(ToListDto)
+            .ToListAsync();
+    }
+
+    private static readonly Expression<Func<EcoLoop.Api.Models.MaterialListing, MaterialListingListDto>> ToListDto =
+        listing => new MaterialListingListDto
+        {
+            Id = listing.Id,
+            BusinessId = listing.BusinessId,
+            Title = listing.Title,
+            Category = listing.Category,
+            Description = listing.Description,
+            Quantity = listing.Quantity,
+            Unit = listing.Unit,
+            Location = listing.Location,
+            Price = listing.Price,
+            PriceUnit = listing.PriceUnit,
+            Seller = listing.Business != null ? listing.Business.BusinessName : null,
+            SellerIsVerified = listing.Business != null && listing.Business.IsVerified,
+            Type = (int)listing.Type,
+            Status = (int)listing.Status,
+            CreatedAt = listing.CreatedAt,
+            ImageUrl = listing.ImageUrl,
+            SellerDeliveryAvailable = listing.SellerDeliveryAvailable
+        };
 
     public async Task<MaterialListingDetailsDto?> GetByIdAsync(Guid id)
     {
@@ -106,7 +132,8 @@ public class MaterialListingService : IMaterialListingService
                 Type = (int)listing.Type,
                 Status = (int)listing.Status,
                 CreatedAt = listing.CreatedAt,
-                ImageUrl = listing.ImageUrl
+                ImageUrl = listing.ImageUrl,
+                SellerDeliveryAvailable = listing.SellerDeliveryAvailable
             })
             .FirstOrDefaultAsync();
     }
@@ -128,7 +155,8 @@ public class MaterialListingService : IMaterialListingService
             Type = (EcoLoop.Api.Models.ListingType)request.Type,
             Status = EcoLoop.Api.Models.ListingStatus.Active,
             CreatedAt = DateTime.UtcNow,
-            ImageUrl = request.ImageUrl
+            ImageUrl = request.ImageUrl,
+            SellerDeliveryAvailable = request.SellerDeliveryAvailable
         };
 
         _db.MaterialListings.Add(listing);
@@ -154,6 +182,7 @@ public class MaterialListingService : IMaterialListingService
         listing.Price = request.Price;
         listing.PriceUnit = request.PriceUnit;
         listing.DeliveryMethod = request.DeliveryMethod;
+        listing.SellerDeliveryAvailable = request.SellerDeliveryAvailable;
         listing.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();

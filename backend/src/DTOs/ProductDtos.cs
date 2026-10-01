@@ -9,6 +9,7 @@ public class CreateProductRequest
     public string MaterialType { get; set; } = string.Empty;
     public decimal Price { get; set; }
     public int AvailableQuantity { get; set; } = 1;
+    public bool SellerDeliveryAvailable { get; set; }
 }
 
 public class PurchaseRequest
@@ -23,10 +24,12 @@ public class UpdateProductRequest
     public string Description { get; set; } = string.Empty;
     public string MaterialType { get; set; } = string.Empty;
     public decimal Price { get; set; }
+    public bool SellerDeliveryAvailable { get; set; }
 }
 
 public class ProductListDto
 {
+    public Guid BusinessId { get; set; }
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
@@ -37,10 +40,12 @@ public class ProductListDto
     public bool SellerIsVerified { get; set; }
     public int AvailableQuantity { get; set; }
     public string? PrimaryImageUrl { get; set; }
+    public bool SellerDeliveryAvailable { get; set; }
 }
 
 public class ProductDetailsDto
 {
+    public Guid BusinessId { get; set; }
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
@@ -51,4 +56,5 @@ public class ProductDetailsDto
     public bool SellerIsVerified { get; set; }
     public int AvailableQuantity { get; set; }
     public List<string> Images { get; set; } = [];
+    public bool SellerDeliveryAvailable { get; set; }
 }

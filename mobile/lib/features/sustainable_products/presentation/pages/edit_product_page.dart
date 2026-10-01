@@ -31,6 +31,7 @@ class _EditProductPageState extends ConsumerState<EditProductPage> {
   String? _selectedCategoryId;
   bool _loadingCategories = true;
   bool _submitting = false;
+  bool _sellerDelivery = false;
 
   final ImagePicker _picker = ImagePicker();
   final List<XFile> _images = [];
@@ -45,6 +46,7 @@ class _EditProductPageState extends ConsumerState<EditProductPage> {
     _materialController.text = widget.product.materialType;
     _priceController.text = widget.product.price.toStringAsFixed(2);
     _stockController.text = widget.product.availableQuantity.toString();
+    _sellerDelivery = widget.product.sellerDeliveryAvailable;
     _loadCategories();
   }
 
@@ -175,6 +177,7 @@ class _EditProductPageState extends ConsumerState<EditProductPage> {
         'materialType': _materialController.text.trim(),
         'price': double.parse(_priceController.text.trim()),
         'availableQuantity': int.parse(_stockController.text.trim()),
+        'sellerDeliveryAvailable': _sellerDelivery,
       };
 
       await ref.read(productRepositoryProvider).updateProduct(widget.product.id, productBody);
@@ -438,6 +441,16 @@ class _EditProductPageState extends ConsumerState<EditProductPage> {
                 if (qty < 0) return 'Quantity cannot be negative';
                 return null;
               },
+            ),
+            const SizedBox(height: 20),
+
+            // ── Delivery ────────────────────────────────────────
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Seller delivery available'),
+              subtitle: const Text('You deliver it yourself; buyers can still choose self pickup.'),
+              value: _sellerDelivery,
+              onChanged: (value) => setState(() => _sellerDelivery = value),
             ),
             const SizedBox(height: 20),
 

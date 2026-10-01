@@ -11,7 +11,7 @@ using Google.Apis.Auth.OAuth2;
 DotNetEnv.Env.Load();
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options => options.Filters.Add<EcoLoop.Api.Controllers.TransactionExceptionFilter>());
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<NotificationService>();
 
@@ -35,6 +35,16 @@ builder.Services.AddScoped<IProductImageService, ProductImageService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IMaterialListingService, MaterialListingService>();
 builder.Services.AddScoped<IBusinessService, BusinessService>();
+builder.Services.AddScoped<IMaterialTransactionService, MaterialTransactionService>();
+builder.Services.AddScoped<IProductOrderService, ProductOrderService>();
+builder.Services.AddScoped<DeliveryLocationService>();
+builder.Services.AddScoped<DeliveryTrackingService>();
+builder.Services.AddHttpClient<DeliveryRouteService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(15);
+    // Nominatim's usage policy rejects requests without an identifying User-Agent.
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("EcoLoop/1.0 (student project)");
+});
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -84,6 +94,8 @@ app.MapHub<EcoLoop.Api.Hubs.ChatHub>("/chatHub");
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<EcoLoopDbContext>();
+    // Apply any pending migrations so the database schema always matches the models.
+    context.Database.Migrate();
     var dummyBusinessId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     if (!context.Businesses.Any(b => b.Id == dummyBusinessId))
     {
@@ -116,6 +128,19 @@ using (var scope = app.Services.CreateScope())
         }
     }
     context.SaveChanges();
+
+    // Temporary mobile demo identity until the team's authentication component is integrated.
+    var demoBuyerId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+    if (!context.Businesses.Any(b => b.Id == demoBuyerId))
+    {
+        context.Businesses.Add(new EcoLoop.Api.Models.Business
+        {
+            Id = demoBuyerId,
+            BusinessName = "EcoLoop Demo Buyer",
+            IsVerified = true
+        });
+        context.SaveChanges();
+    }
 }
 
 app.MapGet("/api/seed-business", (EcoLoopDbContext db) => {

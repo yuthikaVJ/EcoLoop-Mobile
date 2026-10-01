@@ -373,6 +373,8 @@ class _AddMaterialPageState extends ConsumerState<AddMaterialPage> {
                           "price": _isIHave ? (double.tryParse(_priceController.text) ?? 0.0) : 0.0,
                           "priceUnit": _selectedUnit,
                           "deliveryMethod": _deliveryOption,
+                          // Lets buyers choose Seller Delivery (the seller delivers; no EcoLoop fleet).
+                          "sellerDeliveryAvailable": _deliveryOption == 'Seller Delivery',
                           "type": _isIHave ? 0 : 1, // 0 = I Have, 1 = I Need
                         };
 

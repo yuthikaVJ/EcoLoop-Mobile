@@ -3,6 +3,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../../../../core/config/app_config.dart';
 
 class AuthRepository {
   final _storage = const FlutterSecureStorage();
@@ -21,7 +22,10 @@ class AuthRepository {
   }
 
   Future<String?> getSavedToken() async {
-    return await _storage.read(key: 'access_token');
+    final token = await _storage.read(key: 'access_token');
+    // Keep the signed-in business (JWT claim) available app-wide.
+    AppConfig.setSessionToken(token);
+    return token;
   }
 
   Future<String?> getSavedRefreshToken() async {
@@ -59,6 +63,7 @@ class AuthRepository {
         // Save the tokens securely
         await _storage.write(key: 'access_token', value: token);
         await _storage.write(key: 'refresh_token', value: refreshToken);
+        AppConfig.setSessionToken(token);
       } else {
         throw Exception('Backend authentication failed: ${response.statusCode} - ${response.body}');
       }
@@ -78,6 +83,7 @@ class AuthRepository {
     }
     await _storage.delete(key: 'access_token');
     await _storage.delete(key: 'refresh_token');
+    AppConfig.setSessionToken(null);
   }
 
   Future<bool> refreshToken() {
@@ -113,6 +119,7 @@ class AuthRepository {
         
         await _storage.write(key: 'access_token', value: newToken);
         await _storage.write(key: 'refresh_token', value: newRefreshToken);
+        AppConfig.setSessionToken(newToken);
         return true;
       } else {
         // Tokens are invalid/expired, require re-login

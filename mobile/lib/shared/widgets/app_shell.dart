@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/materials_marketplace/presentation/pages/inbox_page.dart';
+import '../../features/transactions_delivery/presentation/pages/transactions_hub_page.dart';
 import 'marketplace_page.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -34,6 +35,8 @@ class _AppShellState extends State<AppShell> {
       key: ValueKey('marketplace_$_marketplaceTabIndex'),
       initialTabIndex: _marketplaceTabIndex,
     ),
+    // Transactions, product orders and (for sellers) My Deliveries.
+    const TransactionsHubPage(),
     const InboxPage(),
     const ProfilePage(),
   ];
@@ -84,6 +87,11 @@ class _AppShellState extends State<AppShell> {
             icon: Icon(Icons.storefront_outlined),
             activeIcon: Icon(Icons.storefront),
             label: 'Marketplace',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.receipt_long_outlined),
+            activeIcon: Icon(Icons.receipt_long),
+            label: 'Orders',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.notifications_outlined),

@@ -59,7 +59,9 @@ class _EditMaterialPageState extends ConsumerState<EditMaterialPage> {
     _priceController.text = widget.listing.price.toStringAsFixed(2);
     _locationController.text = widget.listing.location;
     _selectedCategory = _categories.contains(widget.listing.category) ? widget.listing.category : null;
-    _deliveryOption = widget.listing.deliveryMethod ?? 'Self Pickup';
+    _deliveryOption = widget.listing.sellerDeliveryAvailable || widget.listing.deliveryMethod == 'Seller Delivery'
+        ? 'Seller Delivery'
+        : 'Self Pickup';
   }
 
   @override
@@ -383,6 +385,8 @@ class _EditMaterialPageState extends ConsumerState<EditMaterialPage> {
                           "price": _isIHave ? (double.tryParse(_priceController.text) ?? 0.0) : 0.0,
                           "priceUnit": _selectedUnit,
                           "deliveryMethod": _deliveryOption,
+                          // Lets buyers choose Seller Delivery (the seller delivers; no EcoLoop fleet).
+                          "sellerDeliveryAvailable": _deliveryOption == 'Seller Delivery',
                           "type": _isIHave ? 0 : 1, // 0 = I Have, 1 = I Need
                         };
 

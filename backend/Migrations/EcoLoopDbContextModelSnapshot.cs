@@ -17,7 +17,6 @@ namespace backend.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("ProductVersion", "8.0.29")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
@@ -98,6 +97,99 @@ namespace backend.Migrations
                     b.ToTable("ChatMessages");
                 });
 
+            modelBuilder.Entity("EcoLoop.Api.Models.Delivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<double?>("CurrentLatitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("CurrentLongitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("LocationUpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("MaterialTransactionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("ProductOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MaterialTransactionId")
+                        .IsUnique();
+
+                    b.HasIndex("ProductOrderId")
+                        .IsUnique();
+
+                    b.ToTable("Deliveries", t =>
+                        {
+                            t.HasCheckConstraint("CK_Deliveries_ExactlyOneParent", "(\"MaterialTransactionId\" IS NOT NULL AND \"ProductOrderId\" IS NULL) OR (\"MaterialTransactionId\" IS NULL AND \"ProductOrderId\" IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("EcoLoop.Api.Models.DeliveryLocation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .IsConcurrencyToken()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId", "Label");
+
+                    b.ToTable("DeliveryLocations", t =>
+                        {
+                            t.HasCheckConstraint("CK_DeliveryLocations_Coordinates", "(\"Latitude\" IS NULL AND \"Longitude\" IS NULL) OR (\"Latitude\" IS NOT NULL AND \"Longitude\" IS NOT NULL AND \"Latitude\" BETWEEN -90 AND 90 AND \"Longitude\" BETWEEN -180 AND 180)");
+                        });
+                });
+
             modelBuilder.Entity("EcoLoop.Api.Models.DeviceToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -128,12 +220,14 @@ namespace backend.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<bool>("IsAvailable")
+                        .IsConcurrencyToken()
                         .HasColumnType("boolean");
 
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
                     b.Property<int>("Quantity")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
@@ -187,6 +281,9 @@ namespace backend.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<bool>("SellerDeliveryAvailable")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -215,6 +312,100 @@ namespace backend.Migrations
                     b.HasIndex("Type");
 
                     b.ToTable("MaterialListings");
+                });
+
+            modelBuilder.Entity("EcoLoop.Api.Models.MaterialTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BuyerBusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("MaterialListingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<Guid>("SellerBusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .IsConcurrencyToken()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MaterialListingId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("BuyerBusinessId", "CreatedAt");
+
+                    b.HasIndex("SellerBusinessId", "CreatedAt");
+
+                    b.ToTable("MaterialTransactions", t =>
+                        {
+                            t.HasCheckConstraint("CK_MaterialTransactions_Amounts", "\"UnitPrice\" >= 0 AND \"TotalAmount\" >= 0");
+
+                            t.HasCheckConstraint("CK_MaterialTransactions_DifferentParties", "\"BuyerBusinessId\" <> \"SellerBusinessId\"");
+
+                            t.HasCheckConstraint("CK_MaterialTransactions_Quantity", "\"Quantity\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("EcoLoop.Api.Models.MaterialTransactionStatusHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ChangedByBusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("MaterialTransactionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChangedByBusinessId");
+
+                    b.HasIndex("MaterialTransactionId", "CreatedAt");
+
+                    b.ToTable("MaterialTransactionStatusHistories");
                 });
 
             modelBuilder.Entity("EcoLoop.Api.Models.Product", b =>
@@ -250,6 +441,9 @@ namespace backend.Migrations
                     b.Property<decimal>("Price")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
+
+                    b.Property<bool>("SellerDeliveryAvailable")
+                        .HasColumnType("boolean");
 
                     b.HasKey("Id");
 
@@ -307,6 +501,126 @@ namespace backend.Migrations
                     b.HasIndex("ProductId");
 
                     b.ToTable("ProductImages");
+                });
+
+            modelBuilder.Entity("EcoLoop.Api.Models.ProductOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BuyerBusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SellerBusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .IsConcurrencyToken()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("BuyerBusinessId", "CreatedAt");
+
+                    b.HasIndex("SellerBusinessId", "CreatedAt");
+
+                    b.ToTable("ProductOrders", t =>
+                        {
+                            t.HasCheckConstraint("CK_ProductOrders_DifferentParties", "\"BuyerBusinessId\" <> \"SellerBusinessId\"");
+
+                            t.HasCheckConstraint("CK_ProductOrders_TotalAmount", "\"TotalAmount\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("EcoLoop.Api.Models.ProductOrderItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("ProductOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("ProductOrderId", "ProductId")
+                        .IsUnique();
+
+                    b.ToTable("ProductOrderItems", t =>
+                        {
+                            t.HasCheckConstraint("CK_ProductOrderItems_Amounts", "\"UnitPrice\" >= 0 AND \"LineTotal\" >= 0");
+
+                            t.HasCheckConstraint("CK_ProductOrderItems_Quantity", "\"Quantity\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("EcoLoop.Api.Models.ProductOrderStatusHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ChangedByBusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("ProductOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChangedByBusinessId");
+
+                    b.HasIndex("ProductOrderId", "CreatedAt");
+
+                    b.ToTable("ProductOrderStatusHistories");
                 });
 
             modelBuilder.Entity("EcoLoop.Api.Models.RefreshToken", b =>
@@ -372,6 +686,34 @@ namespace backend.Migrations
                     b.Navigation("Sender");
                 });
 
+            modelBuilder.Entity("EcoLoop.Api.Models.Delivery", b =>
+                {
+                    b.HasOne("EcoLoop.Api.Models.MaterialTransaction", "MaterialTransaction")
+                        .WithOne("Delivery")
+                        .HasForeignKey("EcoLoop.Api.Models.Delivery", "MaterialTransactionId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("EcoLoop.Api.Models.ProductOrder", "ProductOrder")
+                        .WithOne("Delivery")
+                        .HasForeignKey("EcoLoop.Api.Models.Delivery", "ProductOrderId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("MaterialTransaction");
+
+                    b.Navigation("ProductOrder");
+                });
+
+            modelBuilder.Entity("EcoLoop.Api.Models.DeliveryLocation", b =>
+                {
+                    b.HasOne("EcoLoop.Api.Models.Business", "Business")
+                        .WithMany()
+                        .HasForeignKey("BusinessId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Business");
+                });
+
             modelBuilder.Entity("EcoLoop.Api.Models.DeviceToken", b =>
                 {
                     b.HasOne("EcoLoop.Api.Models.Business", "Business")
@@ -405,6 +747,51 @@ namespace backend.Migrations
                     b.Navigation("Business");
                 });
 
+            modelBuilder.Entity("EcoLoop.Api.Models.MaterialTransaction", b =>
+                {
+                    b.HasOne("EcoLoop.Api.Models.Business", "BuyerBusiness")
+                        .WithMany()
+                        .HasForeignKey("BuyerBusinessId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EcoLoop.Api.Models.MaterialListing", "MaterialListing")
+                        .WithMany("Transactions")
+                        .HasForeignKey("MaterialListingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EcoLoop.Api.Models.Business", "SellerBusiness")
+                        .WithMany()
+                        .HasForeignKey("SellerBusinessId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("BuyerBusiness");
+
+                    b.Navigation("MaterialListing");
+
+                    b.Navigation("SellerBusiness");
+                });
+
+            modelBuilder.Entity("EcoLoop.Api.Models.MaterialTransactionStatusHistory", b =>
+                {
+                    b.HasOne("EcoLoop.Api.Models.Business", "ChangedByBusiness")
+                        .WithMany()
+                        .HasForeignKey("ChangedByBusinessId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EcoLoop.Api.Models.MaterialTransaction", "MaterialTransaction")
+                        .WithMany("StatusHistory")
+                        .HasForeignKey("MaterialTransactionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ChangedByBusiness");
+
+                    b.Navigation("MaterialTransaction");
+                });
+
             modelBuilder.Entity("EcoLoop.Api.Models.Product", b =>
                 {
                     b.HasOne("EcoLoop.Api.Models.Business", "Business")
@@ -435,6 +822,62 @@ namespace backend.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("EcoLoop.Api.Models.ProductOrder", b =>
+                {
+                    b.HasOne("EcoLoop.Api.Models.Business", "BuyerBusiness")
+                        .WithMany()
+                        .HasForeignKey("BuyerBusinessId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EcoLoop.Api.Models.Business", "SellerBusiness")
+                        .WithMany()
+                        .HasForeignKey("SellerBusinessId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("BuyerBusiness");
+
+                    b.Navigation("SellerBusiness");
+                });
+
+            modelBuilder.Entity("EcoLoop.Api.Models.ProductOrderItem", b =>
+                {
+                    b.HasOne("EcoLoop.Api.Models.Product", "Product")
+                        .WithMany("OrderItems")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EcoLoop.Api.Models.ProductOrder", "ProductOrder")
+                        .WithMany("Items")
+                        .HasForeignKey("ProductOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+
+                    b.Navigation("ProductOrder");
+                });
+
+            modelBuilder.Entity("EcoLoop.Api.Models.ProductOrderStatusHistory", b =>
+                {
+                    b.HasOne("EcoLoop.Api.Models.Business", "ChangedByBusiness")
+                        .WithMany()
+                        .HasForeignKey("ChangedByBusinessId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EcoLoop.Api.Models.ProductOrder", "ProductOrder")
+                        .WithMany("StatusHistory")
+                        .HasForeignKey("ProductOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ChangedByBusiness");
+
+                    b.Navigation("ProductOrder");
+                });
+
             modelBuilder.Entity("EcoLoop.Api.Models.RefreshToken", b =>
                 {
                     b.HasOne("EcoLoop.Api.Models.Business", "Business")
@@ -446,16 +889,39 @@ namespace backend.Migrations
                     b.Navigation("Business");
                 });
 
+            modelBuilder.Entity("EcoLoop.Api.Models.MaterialListing", b =>
+                {
+                    b.Navigation("Transactions");
+                });
+
+            modelBuilder.Entity("EcoLoop.Api.Models.MaterialTransaction", b =>
+                {
+                    b.Navigation("Delivery");
+
+                    b.Navigation("StatusHistory");
+                });
+
             modelBuilder.Entity("EcoLoop.Api.Models.Product", b =>
                 {
                     b.Navigation("Images");
 
                     b.Navigation("Inventory");
+
+                    b.Navigation("OrderItems");
                 });
 
             modelBuilder.Entity("EcoLoop.Api.Models.ProductCategory", b =>
                 {
                     b.Navigation("Products");
+                });
+
+            modelBuilder.Entity("EcoLoop.Api.Models.ProductOrder", b =>
+                {
+                    b.Navigation("Delivery");
+
+                    b.Navigation("Items");
+
+                    b.Navigation("StatusHistory");
                 });
 #pragma warning restore 612, 618
         }

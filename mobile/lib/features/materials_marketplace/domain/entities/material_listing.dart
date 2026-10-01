@@ -4,12 +4,13 @@ class MaterialListing {
   final String title;
   final String category;
   final String description;
-  final String quantity;
+  final String quantity; // raw amount, e.g. "20" (see [unit])
   final String unit;
   final String location;
   final double price;
   final String priceUnit;
   final String deliveryMethod;
+  final bool sellerDeliveryAvailable; // buyer may choose Seller Delivery
   final String? companyName; // maps to 'seller'
   final bool isVerifiedSeller; // maps to 'sellerIsVerified'
   final bool isIHave; // maps to 'type' == 0
@@ -29,6 +30,7 @@ class MaterialListing {
     required this.price,
     required this.priceUnit,
     this.deliveryMethod = '',
+    this.sellerDeliveryAvailable = false,
     this.companyName,
     required this.isVerifiedSeller,
     required this.isIHave,
@@ -50,12 +52,13 @@ class MaterialListing {
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       priceUnit: json['priceUnit'] as String? ?? '',
       deliveryMethod: json['deliveryMethod'] as String? ?? '',
+      sellerDeliveryAvailable: json['sellerDeliveryAvailable'] as bool? ?? false,
       companyName: json['seller'] as String?,
       isVerifiedSeller: json['sellerIsVerified'] as bool? ?? false,
       isIHave: (json['type'] as int?) == 0,
       status: json['status'] as int? ?? 0,
       datePosted: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : DateTime.now(),
-      imageUrl: json['imageUrl'] as String? ?? 'https://via.placeholder.com/150', 
+      imageUrl: json['imageUrl'] as String? ?? 'https://via.placeholder.com/150',
     );
   }
 
@@ -72,6 +75,7 @@ class MaterialListing {
       'price': price,
       'priceUnit': priceUnit,
       'deliveryMethod': deliveryMethod,
+      'sellerDeliveryAvailable': sellerDeliveryAvailable,
       'type': isIHave ? 0 : 1,
       'status': status,
     };

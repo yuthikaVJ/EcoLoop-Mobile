@@ -51,12 +51,8 @@ class _DeliveryRunPageState extends State<DeliveryRunPage> {
     final text = _job.destination;
     var destination = parseCoordinates(text);
     if (destination == null && text != null && text.isNotEmpty) {
-      try {
-        final (lat, lng) = await _api.geocode(text);
-        destination = LatLng(lat, lng);
-      } catch (_) {
-        // Unknown address: the seller still sees it as text.
-      }
+      // Unknown address leaves it null: the seller still sees it as text.
+      destination = await placeCoordinates(_api, text);
     }
     LatLng? me;
     try {
@@ -116,7 +112,9 @@ class _DeliveryRunPageState extends State<DeliveryRunPage> {
 
   Future<void> _share({bool quiet = false}) async {
     try {
-      final position = await currentPosition();
+      final position = await currentPosition(
+        maxAge: const Duration(seconds: 20),
+      );
       final job = await _api.shareDeliveryPosition(
         _job.id,
         position.latitude,

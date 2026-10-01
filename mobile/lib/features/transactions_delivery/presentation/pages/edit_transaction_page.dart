@@ -67,8 +67,10 @@ class _EditTransactionPageState extends State<EditTransactionPage> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text(
-            'These proposed terms remain subject to seller acceptance.',
+          Text(
+            widget.transaction.isRequest
+                ? "These proposed terms remain subject to the requester's acceptance."
+                : "These proposed terms remain subject to the seller's acceptance.",
           ),
           TextFormField(
             controller: _quantity,

@@ -22,7 +22,8 @@ class DeliveryInfo {
     this.sellerLocationAt,
   });
 
-  bool get hasSellerPosition => sellerLatitude != null && sellerLongitude != null;
+  bool get hasSellerPosition =>
+      sellerLatitude != null && sellerLongitude != null;
 
   factory DeliveryInfo.fromJson(Map<String, dynamic> json) => DeliveryInfo(
     id: json['id']?.toString() ?? '',
@@ -165,6 +166,10 @@ class MaterialTransactionSummary {
 class MaterialTransactionDetails extends MaterialTransactionSummary {
   final String buyerBusinessId;
   final String sellerBusinessId;
+
+  /// An offer to supply an "I Need" listing: the requester (buyer) accepts it
+  /// and picks pickup or delivery; otherwise the seller accepts.
+  final bool isRequest;
   final double unitPrice;
   final DeliveryInfo? delivery;
   final List<StatusHistoryEntry> statusHistory;
@@ -183,6 +188,7 @@ class MaterialTransactionDetails extends MaterialTransactionSummary {
     required super.createdAt,
     required this.buyerBusinessId,
     required this.sellerBusinessId,
+    this.isRequest = false,
     required this.unitPrice,
     this.delivery,
     required this.statusHistory,
@@ -205,6 +211,7 @@ class MaterialTransactionDetails extends MaterialTransactionSummary {
       updatedAt: json['updatedAt'] as String?,
       buyerBusinessId: json['buyerBusinessId'].toString(),
       sellerBusinessId: json['sellerBusinessId'].toString(),
+      isRequest: (json['listingType'] as num?)?.toInt() == 1,
       unitPrice: (json['unitPrice'] as num).toDouble(),
       delivery: json['delivery'] == null
           ? null

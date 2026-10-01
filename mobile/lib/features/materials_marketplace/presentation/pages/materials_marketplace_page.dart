@@ -3,8 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/material_listing.dart';
 import '../providers/material_listings_provider.dart';
-import '../widgets/featured_material_card.dart';
-import '../widgets/grid_material_card.dart';
+import '../widgets/material_list_card.dart';
 import 'add_material_page.dart';
 import 'material_details_page.dart';
 import 'my_listings_page.dart';
@@ -13,10 +12,13 @@ class MaterialsMarketplacePage extends ConsumerStatefulWidget {
   const MaterialsMarketplacePage({super.key});
 
   @override
-  ConsumerState<MaterialsMarketplacePage> createState() => _MaterialsMarketplacePageState();
+  ConsumerState<MaterialsMarketplacePage> createState() =>
+      _MaterialsMarketplacePageState();
 }
 
-class _MaterialsMarketplacePageState extends ConsumerState<MaterialsMarketplacePage> with SingleTickerProviderStateMixin {
+class _MaterialsMarketplacePageState
+    extends ConsumerState<MaterialsMarketplacePage>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -43,13 +45,15 @@ class _MaterialsMarketplacePageState extends ConsumerState<MaterialsMarketplaceP
     super.dispose();
   }
 
-  List<MaterialListing> _getFilteredListings(List<MaterialListing> allListings) {
+  List<MaterialListing> _getFilteredListings(
+    List<MaterialListing> allListings,
+  ) {
     final bool isIHaveTab = _tabController.index == 0;
-    
+
     return allListings.where((listing) {
       // 1. Filter by active tab
       if (listing.isIHave != isIHaveTab) return false;
-      
+
       // 2. Filter by search query
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.toLowerCase();
@@ -59,6 +63,34 @@ class _MaterialsMarketplacePageState extends ConsumerState<MaterialsMarketplaceP
       }
       return true;
     }).toList();
+  }
+
+  void _openAddPage() {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            AddMaterialPage(initialIsIHave: _tabController.index == 0),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(0.0, 1.0);
+          const end = Offset.zero;
+          const curve = Curves.easeOutCubic;
+          final tween = Tween(
+            begin: begin,
+            end: end,
+          ).chain(CurveTween(curve: curve));
+          final offsetAnimation = animation.drive(tween);
+          final fadeAnimation = Tween<double>(
+            begin: 0.0,
+            end: 1.0,
+          ).animate(CurvedAnimation(parent: animation, curve: Curves.easeIn));
+          return SlideTransition(
+            position: offsetAnimation,
+            child: FadeTransition(opacity: fadeAnimation, child: child),
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 400),
+      ),
+    );
   }
 
   @override
@@ -88,14 +120,15 @@ class _MaterialsMarketplacePageState extends ConsumerState<MaterialsMarketplaceP
                 const Spacer(),
                 // My Listings shortcut
                 IconButton(
-                  icon: const Icon(Icons.list_alt,
-                      color: AppColors.forestGreen),
+                  icon: const Icon(
+                    Icons.list_alt,
+                    color: AppColors.forestGreen,
+                  ),
                   tooltip: 'My Listings',
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                          builder: (_) => const MyListingsPage()),
+                      MaterialPageRoute(builder: (_) => const MyListingsPage()),
                     );
                   },
                 ),
@@ -108,16 +141,19 @@ class _MaterialsMarketplacePageState extends ConsumerState<MaterialsMarketplaceP
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
             child: TextField(
               controller: _searchController,
-              onChanged: (value) =>
-                  setState(() => _searchQuery = value),
+              onChanged: (value) => setState(() => _searchQuery = value),
               decoration: InputDecoration(
                 hintText: 'Search materials, categories...',
-                prefixIcon: const Icon(Icons.search,
-                    color: AppColors.slateGray),
+                prefixIcon: const Icon(
+                  Icons.search,
+                  color: AppColors.slateGray,
+                ),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear,
-                            color: AppColors.slateGray),
+                        icon: const Icon(
+                          Icons.clear,
+                          color: AppColors.slateGray,
+                        ),
                         onPressed: () => setState(() {
                           _searchController.clear();
                           _searchQuery = '';
@@ -133,180 +169,66 @@ class _MaterialsMarketplacePageState extends ConsumerState<MaterialsMarketplaceP
             child: listingsAsyncValue.when(
               skipLoadingOnReload: false,
               skipLoadingOnRefresh: false,
-              loading: () => _MaterialsSkeletonView(),
+              loading: () => const _MaterialsSkeletonView(),
               error: (err, stack) => Center(
-                child: Text('Error loading materials: $err',
-                    style: const TextStyle(color: Colors.red)),
+                child: Text(
+                  'Error loading materials: $err',
+                  style: const TextStyle(color: Colors.red),
+                ),
               ),
               data: (allListings) {
                 final listings = _getFilteredListings(allListings);
-                final bool isSearching = _searchQuery.isNotEmpty;
-                final featuredListings =
-                    isSearching ? <MaterialListing>[] : listings.take(3).toList();
-                final gridListings =
-                    isSearching ? listings : listings.skip(3).toList();
-
-                return AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
+                return RefreshIndicator(
+                  color: AppColors.forestGreen,
+                  onRefresh: () async {
+                    ref.invalidate(activeListingsNotifierProvider);
+                  },
+                  // One consistent vertical list: fills the page whether there
+                  // is 1 listing or 50 (the old "first 3 in a row" layout left
+                  // the rest of the page blank when a tab had few items).
                   child: listings.isEmpty
-                      ? const Center(
-                          key: ValueKey('empty'),
-                          child: Text('No materials found.'),
+                      ? _EmptyState(
+                          isIHave: _tabController.index == 0,
+                          searchQuery: _searchQuery,
+                          onPost: _openAddPage,
                         )
-                      : RefreshIndicator(
-                          color: AppColors.forestGreen,
-                          onRefresh: () async {
-                            ref.invalidate(activeListingsNotifierProvider);
+                      : ListView.separated(
+                          key: PageStorageKey(
+                            'materials_${_tabController.index}',
+                          ),
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
+                          itemCount: listings.length + 1,
+                          separatorBuilder: (_, index) =>
+                              SizedBox(height: index == 0 ? 8 : 12),
+                          itemBuilder: (context, index) {
+                            if (index == 0) {
+                              return _ListHeader(
+                                count: listings.length,
+                                searchQuery: _searchQuery,
+                              );
+                            }
+                            final listing = listings[index - 1];
+                            final heroTag = 'hero_list_${listing.id}';
+                            return _FadeIn(
+                              index: index - 1,
+                              child: MaterialListCard(
+                                listing: listing,
+                                heroTag: heroTag,
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => MaterialDetailsPage(
+                                      listing: listing,
+                                      heroTag: heroTag,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
                           },
-                          child: CustomScrollView(
-                            key: ValueKey(
-                                'list_${_tabController.index}_${isSearching ? "search" : "default"}'),
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            slivers: [
-                              // Featured Carousel
-                            if (featuredListings.isNotEmpty)
-                              SliverToBoxAdapter(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    const Padding(
-                                      padding: EdgeInsets.symmetric(
-                                          horizontal: 16.0, vertical: 8.0),
-                                      child: Text('Featured Listings',
-                                          style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 18)),
-                                    ),
-                                    SizedBox(
-                                      height: 220,
-                                      child: ListView.builder(
-                                        scrollDirection: Axis.horizontal,
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 16),
-                                        itemCount: featuredListings.length,
-                                        itemBuilder: (context, index) {
-                                          return TweenAnimationBuilder(
-                                            tween: Tween<double>(
-                                                begin: 0, end: 1),
-                                            duration: Duration(
-                                                milliseconds:
-                                                    400 + (index * 100)),
-                                            curve: Curves.easeOutCubic,
-                                            builder: (context, double value,
-                                                child) {
-                                              return Transform.translate(
-                                                offset: Offset(
-                                                    50 * (1 - value), 0),
-                                                child: Opacity(
-                                                    opacity: value,
-                                                    child: child),
-                                              );
-                                            },
-                                            child: FeaturedMaterialCard(
-                                              listing:
-                                                  featuredListings[index],
-                                              onTap: () {
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (_) =>
-                                                        MaterialDetailsPage(
-                                                      listing: featuredListings[
-                                                          index],
-                                                      heroTag:
-                                                          'hero_featured_${featuredListings[index].id}',
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                  ],
-                                ),
-                              ),
-
-                            // Grid View Header
-                            if (gridListings.isNotEmpty)
-                              const SliverToBoxAdapter(
-                                child: Padding(
-                                  padding: EdgeInsets.fromLTRB(
-                                      16.0, 8.0, 16.0, 16.0),
-                                  child: Text('All Materials',
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 18)),
-                                ),
-                              ),
-
-                            // Grid View
-                            if (gridListings.isNotEmpty)
-                              SliverPadding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16),
-                                sliver: SliverGrid(
-                                  gridDelegate:
-                                      const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 2,
-                                    childAspectRatio: 0.8,
-                                    crossAxisSpacing: 16,
-                                    mainAxisSpacing: 16,
-                                  ),
-                                  delegate: SliverChildBuilderDelegate(
-                                    (context, index) {
-                                      return TweenAnimationBuilder(
-                                        tween: Tween<double>(
-                                            begin: 0, end: 1),
-                                        duration: Duration(
-                                            milliseconds:
-                                                400 + (index * 50)),
-                                        curve: Curves.easeOutCubic,
-                                        builder: (context, double value,
-                                            child) {
-                                          return Transform.translate(
-                                            offset:
-                                                Offset(0, 50 * (1 - value)),
-                                            child: Opacity(
-                                                opacity: value,
-                                                child: child),
-                                          );
-                                        },
-                                        child: RepaintBoundary(
-                                          child: GridMaterialCard(
-                                            listing: gridListings[index],
-                                            onTap: () {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (_) =>
-                                                      MaterialDetailsPage(
-                                                    listing:
-                                                        gridListings[index],
-                                                    heroTag:
-                                                        'hero_grid_${gridListings[index].id}',
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    childCount: gridListings.length,
-                                  ),
-                                ),
-                              ),
-
-                            const SliverToBoxAdapter(
-                                child: SizedBox(height: 80)),
-                          ],
                         ),
-                      ),
-                    );
+                );
               },
             ),
           ),
@@ -315,105 +237,220 @@ class _MaterialsMarketplacePageState extends ConsumerState<MaterialsMarketplaceP
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppColors.forestGreen,
         child: const Icon(Icons.add, color: AppColors.white),
-        onPressed: () {
-          Navigator.of(context).push(
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) =>
-                  AddMaterialPage(
-                      initialIsIHave: _tabController.index == 0),
-              transitionsBuilder:
-                  (context, animation, secondaryAnimation, child) {
-                const begin = Offset(0.0, 1.0);
-                const end = Offset.zero;
-                const curve = Curves.easeOutCubic;
-                final tween = Tween(begin: begin, end: end)
-                    .chain(CurveTween(curve: curve));
-                final offsetAnimation = animation.drive(tween);
-                final fadeAnimation =
-                    Tween<double>(begin: 0.0, end: 1.0).animate(
-                  CurvedAnimation(
-                      parent: animation, curve: Curves.easeIn),
-                );
-                return SlideTransition(
-                  position: offsetAnimation,
-                  child: FadeTransition(
-                      opacity: fadeAnimation, child: child),
-                );
-              },
-              transitionDuration: const Duration(milliseconds: 400),
-            ),
-          );
-        },
+        onPressed: _openAddPage,
       ),
     );
   }
 }
 
 // ── Skeleton loading view ─────────────────────────────────────────────────────
+// Same shape as the real list (header + MaterialListCard rows) so nothing
+// jumps when the data arrives.
 
 class _MaterialsSkeletonView extends StatelessWidget {
+  const _MaterialsSkeletonView();
+
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
+    return ListView.separated(
       physics: const NeverScrollableScrollPhysics(),
-      slivers: [
-        // Featured skeleton row
-        SliverToBoxAdapter(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: _SkeletonBox(width: 160, height: 18),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      itemCount: 7,
+      separatorBuilder: (_, index) => SizedBox(height: index == 0 ? 8 : 12),
+      itemBuilder: (_, index) => index == 0
+          ? const Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 6),
+                child: _SkeletonBox(width: 90, height: 12),
               ),
-              SizedBox(
-                height: 220,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: 3,
-                  itemBuilder: (_, __) => const Padding(
-                    padding: EdgeInsets.only(right: 16),
-                    child: _FeaturedCardSkeleton(),
+            )
+          : const _ListCardSkeleton(),
+    );
+  }
+}
+
+class _ListCardSkeleton extends StatelessWidget {
+  const _ListCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.mintGreen),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SkeletonBox(
+            width: MaterialListCard.thumbnailSize,
+            height: MaterialListCard.thumbnailSize,
+            borderRadius: 12,
+          ),
+          SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SkeletonBox(width: 64, height: 10),
+                SizedBox(height: 8),
+                _SkeletonBox(width: double.infinity, height: 14),
+                SizedBox(height: 8),
+                _SkeletonBox(width: 90, height: 14),
+                SizedBox(height: 10),
+                _SkeletonBox(width: 150, height: 10),
+                SizedBox(height: 6),
+                _SkeletonBox(width: 100, height: 10),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── List header / empty state / entry animation ──────────────────────────────
+
+class _ListHeader extends StatelessWidget {
+  const _ListHeader({required this.count, required this.searchQuery});
+
+  final int count;
+  final String searchQuery;
+
+  @override
+  Widget build(BuildContext context) {
+    final noun = count == 1 ? 'listing' : 'listings';
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Text(
+        searchQuery.isEmpty
+            ? '$count $noun'
+            : '$count $noun for "$searchQuery"',
+        style: const TextStyle(
+          color: AppColors.slateGray,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({
+    required this.isIHave,
+    required this.searchQuery,
+    required this.onPost,
+  });
+
+  final bool isIHave;
+  final String searchQuery;
+  final VoidCallback onPost;
+
+  @override
+  Widget build(BuildContext context) {
+    final searching = searchQuery.isNotEmpty;
+    final title = searching
+        ? 'No results for "$searchQuery"'
+        : isIHave
+        ? 'No materials available yet'
+        : 'No material requests yet';
+    final message = searching
+        ? 'Try a different name or category.'
+        : isIHave
+        ? 'Materials that businesses have to offer will appear here.'
+        : 'Materials that businesses are looking for will appear here.';
+    // Scrollable so pull-to-refresh still works on an empty list.
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(32, 24, 32, 96),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: const BoxDecoration(
+                    color: AppColors.mintGreen,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    searching ? Icons.search_off : Icons.inventory_2_outlined,
+                    color: AppColors.forestGreen,
+                    size: 32,
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        ),
-        // Grid header skeleton
-        const SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: _SkeletonBox(width: 120, height: 18),
-          ),
-        ),
-        // Grid skeleton
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          sliver: SliverGrid(
-            gridDelegate:
-                const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 0.8,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
+                const SizedBox(height: 16),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.darkCharcoal,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppColors.slateGray),
+                ),
+                if (!searching) ...[
+                  const SizedBox(height: 20),
+                  OutlinedButton.icon(
+                    onPressed: onPost,
+                    icon: const Icon(Icons.add),
+                    label: Text(isIHave ? 'Post a material' : 'Post a request'),
+                  ),
+                ],
+              ],
             ),
-            delegate: SliverChildBuilderDelegate(
-              (_, __) => const _GridCardSkeleton(),
-              childCount: 6,
-            ),
           ),
         ),
-      ],
+      ),
+    );
+  }
+}
+
+/// Subtle staggered fade/slide for list rows (capped so long lists stay quick).
+class _FadeIn extends StatelessWidget {
+  const _FadeIn({required this.index, required this.child});
+
+  final int index;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: 220 + 40 * index.clamp(0, 6)),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          offset: Offset(0, 12 * (1 - value)),
+          child: child,
+        ),
+      ),
+      child: child,
     );
   }
 }
 
 class _SkeletonBox extends StatefulWidget {
-  const _SkeletonBox({required this.width, required this.height, this.borderRadius = 6});
+  const _SkeletonBox({
+    required this.width,
+    required this.height,
+    this.borderRadius = 6,
+  });
   final double width;
   final double height;
   final double borderRadius;
@@ -431,13 +468,17 @@ class _SkeletonBoxState extends State<_SkeletonBox>
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 900))
-      ..repeat(reverse: true);
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
     _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
   }
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -448,7 +489,10 @@ class _SkeletonBoxState extends State<_SkeletonBox>
         height: widget.height,
         decoration: BoxDecoration(
           color: Color.lerp(
-            const Color(0xFFE8F5ED), const Color(0xFFCFEAD9), _anim.value),
+            const Color(0xFFE8F5ED),
+            const Color(0xFFCFEAD9),
+            _anim.value,
+          ),
           borderRadius: BorderRadius.circular(widget.borderRadius),
         ),
       ),
@@ -456,85 +500,6 @@ class _SkeletonBoxState extends State<_SkeletonBox>
   }
 }
 
-class _FeaturedCardSkeleton extends StatelessWidget {
-  const _FeaturedCardSkeleton();
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 260,
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.slateGray.withValues(alpha: 0.10),
-            blurRadius: 8, offset: const Offset(0, 3)),
-        ],
-      ),
-      child: Column(
-        children: [
-          const Expanded(child: _SkeletonBox(width: 260, height: 140, borderRadius: 0)),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                _SkeletonBox(width: 80, height: 10),
-                SizedBox(height: 6),
-                _SkeletonBox(width: 160, height: 14),
-                SizedBox(height: 8),
-                _SkeletonBox(width: 100, height: 12),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GridCardSkeleton extends StatelessWidget {
-  const _GridCardSkeleton();
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.mintGreen, width: 1),
-      ),
-      child: Column(
-        children: [
-          const Expanded(
-            flex: 3,
-            child: ClipRRect(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(11)),
-              child: _SkeletonBox(width: double.infinity, height: double.infinity),
-            ),
-          ),
-          Expanded(
-            flex: 4,
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  _SkeletonBox(width: 60, height: 9),
-                  SizedBox(height: 4),
-                  _SkeletonBox(width: double.infinity, height: 12),
-                  SizedBox(height: 4),
-                  _SkeletonBox(width: 80, height: 12),
-                  Spacer(),
-                  _SkeletonBox(width: 50, height: 14),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 class _IHaveNeedChip extends StatelessWidget {
   const _IHaveNeedChip({
     required this.label,
@@ -553,20 +518,17 @@ class _IHaveNeedChip extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
-        padding:
-            const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
         decoration: BoxDecoration(
-          color:
-              selected ? AppColors.forestGreen : AppColors.mintGreen,
+          color: selected ? AppColors.forestGreen : AppColors.mintGreen,
           borderRadius: BorderRadius.circular(50),
           boxShadow: selected
               ? [
                   BoxShadow(
-                    color:
-                        AppColors.forestGreen.withValues(alpha: 0.30),
+                    color: AppColors.forestGreen.withValues(alpha: 0.30),
                     blurRadius: 6,
                     offset: const Offset(0, 3),
-                  )
+                  ),
                 ]
               : [],
         ),

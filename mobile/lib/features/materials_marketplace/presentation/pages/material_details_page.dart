@@ -246,7 +246,7 @@ class MaterialDetailsPage extends StatelessWidget {
                             MaterialPageRoute(builder: (_) => ConfirmMaterialTransactionPage(listing: listing)),
                           ),
                   child: Text(
-                    isOwnListing ? 'Your Listing' : listing.isIHave ? 'Start Transaction' : 'Offer to Supply',
+                    isOwnListing ? 'Your Listing' : listing.isIHave ? 'Make an Offer' : 'Offer to Supply',
                     style: const TextStyle(color: AppColors.white, fontWeight: FontWeight.bold),
                   ),
                 ),

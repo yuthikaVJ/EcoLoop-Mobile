@@ -85,6 +85,8 @@ public class MaterialTransactionDetailsDto : MaterialTransactionListDto
 {
     public Guid BuyerBusinessId { get; set; }
     public Guid SellerBusinessId { get; set; }
+    // 0 = I Have (the seller accepts), 1 = I Need (an offer: the requester, i.e. the buyer, accepts).
+    public int ListingType { get; set; }
     public decimal UnitPrice { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public DeliveryDto? Delivery { get; set; }

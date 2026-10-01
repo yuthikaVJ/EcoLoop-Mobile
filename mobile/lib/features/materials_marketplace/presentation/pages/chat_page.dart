@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:signalr_netcore/signalr_client.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../../../core/network/api_client_provider.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/material_listing.dart';
+import '../../../../core/config/app_config.dart';
 import 'package:intl/intl.dart';
 
 class ChatMessage {
@@ -12,37 +14,64 @@ class ChatMessage {
   final String text;
   final bool isMe;
   final String time;
+  // Shown immediately on send; replaced by the saved copy when the server echoes it.
+  final bool pending;
 
-  ChatMessage({required this.id, required this.text, required this.isMe, required this.time});
-  
+  ChatMessage({
+    required this.id,
+    required this.text,
+    required this.isMe,
+    required this.time,
+    this.pending = false,
+  });
+
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
     final createdAt = DateTime.parse(json['createdAt']).toLocal();
+    final senderId = json['senderId']?.toString().toLowerCase();
     return ChatMessage(
-      id: json['id'] ?? '',
+      id: json['id']?.toString() ?? '',
       text: json['content'] ?? '',
-      isMe: json['isMe'] ?? false,
+      // History sends isMe; live messages are matched on the sender instead.
+      isMe:
+          json['isMe'] as bool? ??
+          (senderId != null &&
+              senderId == AppConfig.currentBusinessId.toLowerCase()),
       time: DateFormat.jm().format(createdAt),
     );
   }
 }
 
-class ChatPage extends StatefulWidget {
+class ChatPage extends ConsumerStatefulWidget {
   final MaterialListing listing;
+  // The other person in this conversation (the seller for a buyer, the buyer
+  // for a seller replying from the inbox).
   final String receiverId;
+  final String? partnerName;
 
-  const ChatPage({super.key, required this.listing, required this.receiverId});
+  const ChatPage({
+    super.key,
+    required this.listing,
+    required this.receiverId,
+    this.partnerName,
+  });
 
   @override
-  State<ChatPage> createState() => _ChatPageState();
+  ConsumerState<ChatPage> createState() => _ChatPageState();
 }
 
-class _ChatPageState extends State<ChatPage> {
+class _ChatPageState extends ConsumerState<ChatPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  
+
   List<ChatMessage> _messages = [];
   HubConnection? _hubConnection;
   bool _isLoading = true;
+
+  String get _partnerName =>
+      widget.partnerName ?? widget.listing.companyName ?? 'Unknown Company';
+  String get _partnerInitial => _partnerName.isNotEmpty
+      ? _partnerName.substring(0, 1).toUpperCase()
+      : 'U';
 
   @override
   void initState() {
@@ -57,13 +86,13 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _fetchHistory() async {
     try {
-      final token = await const FlutterSecureStorage().read(key: 'access_token');
-      final response = await http.get(
-        Uri.parse('http://10.0.2.2:5252/api/chat/history/${widget.listing.id}'),
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
+      // ApiClient refreshes the access token on 401 (it expires after 15 min).
+      final response = await ref.read(apiClientProvider).get(
+        // Only this conversation (a seller can be chatting with several buyers).
+        '/api/chat/history/${widget.listing.id}',
+        queryParameters: {'with': widget.receiverId},
       );
+      if (!mounted) return;
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -72,27 +101,34 @@ class _ChatPageState extends State<ChatPage> {
           _isLoading = false;
         });
         _scrollToBottom();
+      } else {
+        print('Error fetching history: ${response.statusCode}');
+        setState(() => _isLoading = false);
       }
     } catch (e) {
       print('Error fetching history: $e');
-      setState(() { _isLoading = false; });
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
   Future<void> _connectSignalR() async {
-    final token = await const FlutterSecureStorage().read(key: 'access_token');
-    
+    // Read the token on every (re)connect so a refreshed one is picked up.
+    final authRepository = ref.read(authRepositoryProvider);
+
     _hubConnection = HubConnectionBuilder()
         .withUrl(
-            "http://10.0.2.2:5252/chatHub",
-            options: HttpConnectionOptions(
-                accessTokenFactory: () async => token ?? '',
-            ),
+          "http://10.0.2.2:5252/chatHub",
+          options: HttpConnectionOptions(
+            accessTokenFactory: () async =>
+                await authRepository.getSavedToken() ?? '',
+          ),
         )
         .build();
 
     _hubConnection!.on("ReceiveMessage", _handleReceiveMessage);
-    
+
     try {
       await _hubConnection!.start();
       print("SignalR Connected");
@@ -102,26 +138,38 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _handleReceiveMessage(List<Object?>? args) {
-    if (args != null && args.isNotEmpty) {
-      final msgData = args[0] as Map<String, dynamic>;
-      
-      // Check if this message is for the current listing chat
-      if (msgData['listingId']?.toString().toLowerCase() != widget.listing.id.toLowerCase()) return;
+    if (args == null || args.isEmpty || !mounted) return;
+    final msgData = Map<String, dynamic>.from(args[0] as Map);
 
-      // Ensure we don't duplicate messages (if we sent it, we might get it back via hub and locally, but signalr echoes it anyway)
-      final newMsgId = msgData['id']?.toString() ?? '';
-      if (_messages.any((m) => m.id == newMsgId)) return;
-
-      setState(() {
-        _messages.add(ChatMessage(
-          id: newMsgId,
-          text: msgData['content'] ?? '',
-          isMe: false, // The server payload for ReceiveMessage doesn't have IsMe, but since sender gets it echoed we can fix this below
-          time: DateFormat.jm().format(DateTime.parse(msgData['createdAt']).toLocal()),
-        ));
-      });
-      _scrollToBottom();
+    // Only messages for this listing and this conversation partner.
+    if (msgData['listingId']?.toString().toLowerCase() !=
+        widget.listing.id.toLowerCase()) {
+      return;
     }
+    final partner = widget.receiverId.toLowerCase();
+    final senderId = msgData['senderId']?.toString().toLowerCase();
+    final receiverId = msgData['receiverId']?.toString().toLowerCase();
+    if (senderId != partner && receiverId != partner) return;
+
+    final incoming = ChatMessage.fromJson(msgData);
+    if (_messages.any((m) => m.id == incoming.id)) return;
+
+    setState(() {
+      if (incoming.isMe) {
+        // The server echoes our own message back: replace the optimistic copy
+        // instead of adding it again (that showed it a second time, on the
+        // receiver's side of the chat).
+        final i = _messages.indexWhere(
+          (m) => m.pending && m.text == incoming.text,
+        );
+        if (i >= 0) {
+          _messages[i] = incoming;
+          return;
+        }
+      }
+      _messages.add(incoming);
+    });
+    _scrollToBottom();
   }
 
   void _scrollToBottom() {
@@ -149,9 +197,9 @@ class _ChatPageState extends State<ChatPage> {
     if (text.isEmpty) return;
 
     _messageController.clear();
-    
-    // Add locally immediately for responsive UI
-    final tempId = DateTime.now().millisecondsSinceEpoch.toString();
+
+    // Add locally immediately for responsive UI; the server's echo replaces it.
+    final tempId = 'pending-${DateTime.now().microsecondsSinceEpoch}';
     setState(() {
       _messages.add(
         ChatMessage(
@@ -159,20 +207,32 @@ class _ChatPageState extends State<ChatPage> {
           text: text,
           isMe: true,
           time: DateFormat.jm().format(DateTime.now()),
+          pending: true,
         ),
       );
     });
     _scrollToBottom();
 
-    if (_hubConnection?.state == HubConnectionState.Connected) {
-      try {
-        await _hubConnection!.invoke(
-          "SendMessage",
-          args: [widget.listing.id, widget.receiverId, text],
-        );
-      } catch (e) {
-        print("Send error: $e");
+    try {
+      if (_hubConnection?.state != HubConnectionState.Connected) {
+        await _hubConnection?.start();
       }
+      await _hubConnection!.invoke(
+        "SendMessage",
+        args: [widget.listing.id, widget.receiverId, text],
+      );
+    } catch (e) {
+      // Don't leave a message on screen that was never delivered.
+      if (!mounted) return;
+      setState(() => _messages.removeWhere((m) => m.id == tempId));
+      _messageController.text = text;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Message not sent. Check your connection and try again.',
+          ),
+        ),
+      );
     }
   }
 
@@ -187,8 +247,11 @@ class _ChatPageState extends State<ChatPage> {
               backgroundColor: AppColors.mintGreen,
               radius: 18,
               child: Text(
-                (widget.listing.companyName?.isNotEmpty == true) ? widget.listing.companyName!.substring(0, 1) : 'U',
-                style: const TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.bold),
+                _partnerInitial,
+                style: const TextStyle(
+                  color: AppColors.forestGreen,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -197,12 +260,19 @@ class _ChatPageState extends State<ChatPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.listing.companyName ?? 'Unknown Company',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    _partnerName,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const Text(
                     'Online',
-                    style: TextStyle(fontSize: 12, color: AppColors.ecoGreen, fontWeight: FontWeight.w500),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.ecoGreen,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
@@ -232,7 +302,7 @@ class _ChatPageState extends State<ChatPage> {
                   color: AppColors.slateGray.withOpacity(0.05),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
-                )
+                ),
               ],
             ),
             child: Row(
@@ -244,7 +314,10 @@ class _ChatPageState extends State<ChatPage> {
                     color: AppColors.mintGreen,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.inventory_2_outlined, color: AppColors.ecoGreen),
+                  child: const Icon(
+                    Icons.inventory_2_outlined,
+                    color: AppColors.ecoGreen,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -258,8 +331,13 @@ class _ChatPageState extends State<ChatPage> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        '\$${widget.listing.price.toStringAsFixed(0)} / ${widget.listing.priceUnit}',
-                        style: const TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.w600),
+                        widget.listing.isIHave
+                            ? '\$${widget.listing.price.toStringAsFixed(0)} / ${widget.listing.priceUnit}'
+                            : 'Wanted',
+                        style: const TextStyle(
+                          color: AppColors.forestGreen,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
@@ -271,16 +349,23 @@ class _ChatPageState extends State<ChatPage> {
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: const Text('View Item', style: TextStyle(color: AppColors.ecoGreen)),
+                  child: const Text(
+                    'View Item',
+                    style: TextStyle(color: AppColors.ecoGreen),
+                  ),
                 ),
               ],
             ),
           ),
-          
+
           // Chat Messages
           Expanded(
-            child: _isLoading 
-                ? const Center(child: CircularProgressIndicator(color: AppColors.forestGreen))
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.forestGreen,
+                    ),
+                  )
                 : ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.all(16),
@@ -291,7 +376,7 @@ class _ChatPageState extends State<ChatPage> {
                     },
                   ),
           ),
-          
+
           // Input Area
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -309,10 +394,15 @@ class _ChatPageState extends State<ChatPage> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.add_circle_outline, color: AppColors.slateGray),
+                    icon: const Icon(
+                      Icons.add_circle_outline,
+                      color: AppColors.slateGray,
+                    ),
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Attachments coming soon')),
+                        const SnackBar(
+                          content: Text('Attachments coming soon'),
+                        ),
                       );
                     },
                   ),
@@ -327,13 +417,17 @@ class _ChatPageState extends State<ChatPage> {
                       child: TextField(
                         controller: _messageController,
                         textCapitalization: TextCapitalization.sentences,
-                        maxLines: null, // Allows the field to grow vertically if they type a lot
+                        maxLines:
+                            null, // Allows the field to grow vertically if they type a lot
                         keyboardType: TextInputType.multiline,
                         decoration: const InputDecoration(
                           hintText: 'Type a message...',
                           border: InputBorder.none,
                           isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                         ),
                         // Note: onSubmitted doesn't work well with multiline, but we have the send button
                       ),
@@ -346,7 +440,11 @@ class _ChatPageState extends State<ChatPage> {
                       shape: BoxShape.circle,
                     ),
                     child: IconButton(
-                      icon: const Icon(Icons.send, color: AppColors.white, size: 20),
+                      icon: const Icon(
+                        Icons.send,
+                        color: AppColors.white,
+                        size: 20,
+                      ),
                       onPressed: _sendMessage,
                     ),
                   ),
@@ -363,10 +461,14 @@ class _ChatPageState extends State<ChatPage> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: Column(
-        crossAxisAlignment: message.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: message.isMe
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: message.isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+            mainAxisAlignment: message.isMe
+                ? MainAxisAlignment.end
+                : MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               if (!message.isMe) ...[
@@ -374,17 +476,26 @@ class _ChatPageState extends State<ChatPage> {
                   backgroundColor: AppColors.mintGreen,
                   radius: 12,
                   child: Text(
-                    (widget.listing.companyName?.isNotEmpty == true) ? widget.listing.companyName!.substring(0, 1) : 'U',
-                    style: const TextStyle(color: AppColors.forestGreen, fontSize: 10, fontWeight: FontWeight.bold),
+                    _partnerInitial,
+                    style: const TextStyle(
+                      color: AppColors.forestGreen,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
               ],
               Flexible(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
-                    color: message.isMe ? AppColors.forestGreen : AppColors.white,
+                    color: message.isMe
+                        ? AppColors.forestGreen
+                        : AppColors.white,
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(16),
                       topRight: const Radius.circular(16),
@@ -396,13 +507,15 @@ class _ChatPageState extends State<ChatPage> {
                         color: AppColors.slateGray.withOpacity(0.05),
                         blurRadius: 4,
                         offset: const Offset(0, 2),
-                      )
+                      ),
                     ],
                   ),
                   child: Text(
                     message.text,
                     style: TextStyle(
-                      color: message.isMe ? AppColors.white : AppColors.darkCharcoal,
+                      color: message.isMe
+                          ? AppColors.white
+                          : AppColors.darkCharcoal,
                       fontSize: 15,
                     ),
                   ),

@@ -35,9 +35,14 @@ public class MaterialTransactionService : IMaterialTransactionService
         if (listing.Type == ListingType.INeed && listing.BusinessId != request.BuyerBusinessId)
             return (null, "The listing owner must be the buyer for an I Need listing.");
 
+        // An offer to supply an "I Need" listing: the supplier sets the price and picks Self
+        // Pickup (from their own address) or Seller Delivery (they deliver to the requester).
+        var isOffer = listing.Type == ListingType.INeed;
         var method = (DeliveryMethod)request.Delivery.Method;
-        if (method == DeliveryMethod.SellerDelivery && !listing.SellerDeliveryAvailable)
+        if (!isOffer && method == DeliveryMethod.SellerDelivery && !listing.SellerDeliveryAvailable)
             return (null, "Seller delivery is not available for this listing.");
+        if (isOffer && method == DeliveryMethod.SelfPickup && string.IsNullOrWhiteSpace(request.Delivery.Location))
+            return (null, "Add the pickup location where the requester can collect the material.");
         if (method == DeliveryMethod.SellerDelivery && string.IsNullOrWhiteSpace(request.Delivery.Location))
             return (null, "A delivery location is required for seller delivery.");
 
@@ -65,8 +70,8 @@ public class MaterialTransactionService : IMaterialTransactionService
                 new MaterialTransactionStatusHistory
                 {
                     Status = MaterialTransactionStatus.Pending,
-                    ChangedByBusinessId = request.BuyerBusinessId,
-                    Note = "Transaction requested",
+                    ChangedByBusinessId = isOffer ? request.SellerBusinessId : request.BuyerBusinessId,
+                    Note = isOffer ? "Offer to supply sent" : "Transaction requested",
                     CreatedAt = now
                 }
             ]
@@ -93,16 +98,22 @@ public class MaterialTransactionService : IMaterialTransactionService
         Guid id, Guid actingBusinessId, MaterialTransactionStatus status, string? note)
     {
         if (note?.Length > 500) return (null, "Note must not exceed 500 characters.");
-        var item = await _db.MaterialTransactions.Include(x => x.Delivery).FirstOrDefaultAsync(x => x.Id == id);
+        var item = await _db.MaterialTransactions.Include(x => x.Delivery).Include(x => x.MaterialListing)
+            .FirstOrDefaultAsync(x => x.Id == id);
         if (item == null) return (null, "Material transaction was not found.");
         if (item.Status is MaterialTransactionStatus.Rejected or MaterialTransactionStatus.Completed or MaterialTransactionStatus.Cancelled)
             return (null, "A terminal transaction cannot be changed.");
         if (actingBusinessId != item.BuyerBusinessId && actingBusinessId != item.SellerBusinessId)
             return (null, "The acting business is not a party to this transaction.");
 
-        var sellerOnly = status is MaterialTransactionStatus.Accepted or MaterialTransactionStatus.Rejected
-            or MaterialTransactionStatus.Processing or MaterialTransactionStatus.Ready;
-        if (sellerOnly && actingBusinessId != item.SellerBusinessId)
+        // The listing owner answers the request: the seller of an "I Have" listing, the
+        // requester (buyer) of an "I Need" listing. Fulfilment is always the seller's.
+        var isOffer = item.MaterialListing?.Type == ListingType.INeed;
+        if (status is MaterialTransactionStatus.Accepted or MaterialTransactionStatus.Rejected
+            && actingBusinessId != Responder(item))
+            return (null, isOffer ? "Only the requester can accept or reject this offer." : "Only the seller can perform this action.");
+        if (status is MaterialTransactionStatus.Processing or MaterialTransactionStatus.Ready
+            && actingBusinessId != item.SellerBusinessId)
             return (null, "Only the seller can perform this action.");
         if (!IsValidTransition(item.Status, status))
             return (null, $"Cannot change transaction from {item.Status} to {status}.");
@@ -126,10 +137,10 @@ public class MaterialTransactionService : IMaterialTransactionService
 
     public async Task<MaterialTransactionDetailsDto> UpdateDetailsAsync(Guid id, UpdateMaterialTransactionRequest request)
     {
-        var item = await _db.MaterialTransactions.SingleOrDefaultAsync(x => x.Id == id)
+        var item = await _db.MaterialTransactions.Include(x => x.MaterialListing).SingleOrDefaultAsync(x => x.Id == id)
             ?? throw new TransactionRuleException(404, "Material transaction not found.");
-        if (request.ActingBusinessId != item.BuyerBusinessId)
-            throw new TransactionRuleException(403, "Only the buyer can revise a request.");
+        if (request.ActingBusinessId != Initiator(item))
+            throw new TransactionRuleException(403, "Only the business that sent the request can revise it.");
         if (item.Status != MaterialTransactionStatus.Pending)
             throw new TransactionRuleException(409, "Only pending requests can be revised.");
         if (item.UpdatedAt != request.ExpectedUpdatedAt)
@@ -145,7 +156,7 @@ public class MaterialTransactionService : IMaterialTransactionService
         _db.MaterialTransactionStatusHistories.Add(new()
         {
             MaterialTransactionId = id, Status = item.Status, ChangedByBusinessId = request.ActingBusinessId,
-            Note = $"Request revised from {oldTerms} to {item.Quantity} {item.Unit} at {item.UnitPrice}; awaiting seller acceptance.",
+            Note = $"Request revised from {oldTerms} to {item.Quantity} {item.Unit} at {item.UnitPrice}; awaiting acceptance.",
             CreatedAt = item.UpdatedAt.Value
         });
         await _db.SaveChangesAsync();
@@ -210,6 +221,14 @@ public class MaterialTransactionService : IMaterialTransactionService
         .Include(x => x.Delivery)
         .Include(x => x.StatusHistory).ThenInclude(x => x.ChangedByBusiness);
 
+    // Who sent the request (buyer of an "I Have" listing, supplier of an "I Need" one)
+    // and who answers it (the listing owner).
+    private static Guid Responder(MaterialTransaction x) =>
+        x.MaterialListing?.Type == ListingType.INeed ? x.BuyerBusinessId : x.SellerBusinessId;
+
+    private static Guid Initiator(MaterialTransaction x) =>
+        x.MaterialListing?.Type == ListingType.INeed ? x.SellerBusinessId : x.BuyerBusinessId;
+
     private static bool IsValidTransition(MaterialTransactionStatus current, MaterialTransactionStatus next) =>
         next == MaterialTransactionStatus.Cancelled || (current, next) switch
         {
@@ -256,6 +275,7 @@ public class MaterialTransactionService : IMaterialTransactionService
             CreatedAt = list.CreatedAt,
             BuyerBusinessId = x.BuyerBusinessId,
             SellerBusinessId = x.SellerBusinessId,
+            ListingType = (int)(x.MaterialListing?.Type ?? ListingType.IHave),
             UnitPrice = x.UnitPrice,
             UpdatedAt = x.UpdatedAt,
             Delivery = x.Delivery == null ? null : MapDelivery(x.Delivery),

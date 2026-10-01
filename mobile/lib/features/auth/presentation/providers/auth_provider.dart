@@ -11,6 +11,8 @@ class AuthNotifier extends AsyncNotifier<bool> {
   @override
   Future<bool> build() async {
     _repository = ref.watch(authRepositoryProvider);
+    AuthRepository.onSessionExpired = () =>
+        state = const AsyncValue.data(false);
     return _checkAuthStatus();
   }
 

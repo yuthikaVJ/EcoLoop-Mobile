@@ -5,12 +5,17 @@ class DeliveryMethodSelector extends StatelessWidget {
   final DeliveryMethod value;
   final bool sellerDeliveryAvailable;
   final ValueChanged<DeliveryMethod> onChanged;
+  // Override the buyer-facing descriptions, e.g. for a supplier making an offer.
+  final String? selfPickupSubtitle;
+  final String? sellerDeliverySubtitle;
 
   const DeliveryMethodSelector({
     super.key,
     required this.value,
     required this.sellerDeliveryAvailable,
     required this.onChanged,
+    this.selfPickupSubtitle,
+    this.sellerDeliverySubtitle,
   });
 
   @override
@@ -24,7 +29,9 @@ class DeliveryMethodSelector extends StatelessWidget {
         RadioListTile<DeliveryMethod>(
           value: DeliveryMethod.selfPickup,
           title: const Text('Self Pickup'),
-          subtitle: const Text('Collect directly from the seller'),
+          subtitle: Text(
+            selfPickupSubtitle ?? 'Collect directly from the seller',
+          ),
           secondary: const Icon(Icons.storefront_outlined),
         ),
         RadioListTile<DeliveryMethod>(
@@ -32,9 +39,9 @@ class DeliveryMethodSelector extends StatelessWidget {
           enabled: sellerDeliveryAvailable,
           title: const Text('Seller Delivery'),
           subtitle: Text(
-            sellerDeliveryAvailable
-                ? 'The seller will deliver this item'
-                : 'Not available for this item',
+            !sellerDeliveryAvailable
+                ? 'Not available for this item'
+                : sellerDeliverySubtitle ?? 'The seller will deliver this item',
           ),
           secondary: const Icon(Icons.local_shipping_outlined),
         ),

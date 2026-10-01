@@ -28,6 +28,10 @@ public class ChatHub : Hub
             throw new HubException("Unauthorized sender.");
         }
 
+        content = content?.Trim() ?? string.Empty;
+        if (content.Length == 0) throw new HubException("Message cannot be empty.");
+        if (receiverId == senderId) throw new HubException("You cannot message yourself.");
+
         var message = new ChatMessage
         {
             ListingId = listingId,
@@ -40,11 +44,23 @@ public class ChatHub : Hub
         _db.ChatMessages.Add(message);
         await _db.SaveChangesAsync();
 
+        // Plain payload (not the EF entity) with the sender, so each client can tell
+        // its own messages from the other person's.
+        var payload = new
+        {
+            id = message.Id,
+            listingId = message.ListingId,
+            senderId = message.SenderId,
+            receiverId = message.ReceiverId,
+            content = message.Content,
+            createdAt = message.CreatedAt
+        };
+
         // Broadcast to the receiver
-        await Clients.User(receiverId.ToString()).SendAsync("ReceiveMessage", message);
-        
-        // Also send back to caller so they have the saved message instance
-        await Clients.Caller.SendAsync("ReceiveMessage", message);
+        await Clients.User(receiverId.ToString()).SendAsync("ReceiveMessage", payload);
+
+        // Also send back to the caller: it replaces their optimistic copy with the saved one.
+        await Clients.Caller.SendAsync("ReceiveMessage", payload);
 
         // Send Push Notification to the receiver
         var receiverTokens = await _db.DeviceTokens

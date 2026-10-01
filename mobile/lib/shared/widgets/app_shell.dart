@@ -1,23 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/network/api_client_provider.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/materials_marketplace/presentation/pages/inbox_page.dart';
 import '../../features/transactions_delivery/presentation/pages/transactions_hub_page.dart';
 import 'marketplace_page.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-class AppShell extends StatefulWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
 
   @override
-  State<AppShell> createState() => _AppShellState();
+  ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends ConsumerState<AppShell> {
   int _currentIndex = 0;
 
   int _marketplaceTabIndex = 0;
@@ -51,19 +51,10 @@ class _AppShellState extends State<AppShell> {
     try {
       final token = await FirebaseMessaging.instance.getToken();
       if (token != null) {
-        final authToken =
-            await const FlutterSecureStorage().read(key: 'access_token');
-        if (authToken != null) {
-          await http.post(
-            Uri.parse(
-                'http://10.0.2.2:5252/api/notifications/register-device'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $authToken',
-            },
-            body: jsonEncode({'token': token}),
-          );
-        }
+        await ref.read(apiClientProvider).post(
+          '/api/notifications/register-device',
+          body: jsonEncode({'token': token}),
+        );
       }
     } catch (_) {
       // Non-fatal

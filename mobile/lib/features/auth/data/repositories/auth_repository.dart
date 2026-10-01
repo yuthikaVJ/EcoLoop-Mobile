@@ -8,9 +8,16 @@ import '../../../../core/config/app_config.dart';
 class AuthRepository {
   final _storage = const FlutterSecureStorage();
   final String _baseUrl = 'http://10.0.2.2:5252/api/auth';
-  
+
   bool _initialized = false;
-  Future<bool>? _refreshFuture;
+  // Static: several AuthRepository instances exist (Riverpod's and the
+  // transactions API service's). Refresh tokens are single-use, so two
+  // parallel refreshes would make the loser sign the user out.
+  static Future<bool>? _refreshFuture;
+
+  /// Called when the session can't be refreshed and the user was signed out,
+  /// so the app can return to the login screen.
+  static void Function()? onSessionExpired;
 
   Future<void> _ensureInitialized() async {
     if (!_initialized) {
@@ -35,13 +42,15 @@ class AuthRepository {
   Future<void> signInWithGoogle() async {
     try {
       await _ensureInitialized();
-      final GoogleSignInAccount? googleUser = await GoogleSignIn.instance.authenticate();
+      final GoogleSignInAccount? googleUser = await GoogleSignIn.instance
+          .authenticate();
       if (googleUser == null) {
         // User canceled the sign-in flow
         return;
       }
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
       final String? idToken = googleAuth.idToken;
 
       if (idToken == null) {
@@ -59,13 +68,15 @@ class AuthRepository {
         final data = jsonDecode(response.body);
         final String token = data['token'];
         final String refreshToken = data['refreshToken'];
-        
+
         // Save the tokens securely
         await _storage.write(key: 'access_token', value: token);
         await _storage.write(key: 'refresh_token', value: refreshToken);
         AppConfig.setSessionToken(token);
       } else {
-        throw Exception('Backend authentication failed: ${response.statusCode} - ${response.body}');
+        throw Exception(
+          'Backend authentication failed: ${response.statusCode} - ${response.body}',
+        );
       }
     } catch (e) {
       print('Google Sign-In Error: $e');
@@ -74,16 +85,22 @@ class AuthRepository {
   }
 
   Future<void> signOut() async {
-    await _ensureInitialized();
-    try {
-      await GoogleSignIn.instance.disconnect();
-    } catch (e) {
-      // Disconnect might fail if already disconnected, fallback to signout
-      await GoogleSignIn.instance.signOut();
-    }
+    // Clear our session first so a Google error can't leave the user signed in.
     await _storage.delete(key: 'access_token');
     await _storage.delete(key: 'refresh_token');
     AppConfig.setSessionToken(null);
+
+    try {
+      await _ensureInitialized();
+      await GoogleSignIn.instance.disconnect();
+    } catch (e) {
+      // Disconnect might fail if already disconnected, fallback to signout
+      try {
+        await GoogleSignIn.instance.signOut();
+      } catch (e) {
+        print('Google Sign-Out Error: $e');
+      }
+    }
   }
 
   Future<bool> refreshToken() {
@@ -116,7 +133,7 @@ class AuthRepository {
         final data = jsonDecode(response.body);
         final String newToken = data['token'];
         final String newRefreshToken = data['refreshToken'];
-        
+
         await _storage.write(key: 'access_token', value: newToken);
         await _storage.write(key: 'refresh_token', value: newRefreshToken);
         AppConfig.setSessionToken(newToken);
@@ -124,6 +141,7 @@ class AuthRepository {
       } else {
         // Tokens are invalid/expired, require re-login
         await signOut();
+        onSessionExpired?.call();
         return false;
       }
     } catch (e) {

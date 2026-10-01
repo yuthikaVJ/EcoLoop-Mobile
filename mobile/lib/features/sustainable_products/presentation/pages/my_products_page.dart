@@ -34,18 +34,20 @@ class _MyProductsPageState extends ConsumerState<MyProductsPage> {
   void _deleteProduct(Product product) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      // The dialog has its own context; after it closes, only the page's
+      // `context` may be used (for snackbars).
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Product'),
         content: Text('Are you sure you want to delete "${product.name}"?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               try {
                 await ref.read(productRepositoryProvider).deleteProduct(product.id);
                 if (mounted) {
@@ -72,18 +74,20 @@ class _MyProductsPageState extends ConsumerState<MyProductsPage> {
   void _markAsSold(Product product) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      // The dialog has its own context; after it closes, only the page's
+      // `context` may be used (for snackbars).
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Mark as Sold'),
         content: Text('Are you sure you want to mark "${product.name}" as sold? This will set available quantity to 0.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.forestGreen),
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               try {
                 await ref.read(productRepositoryProvider).markAsSold(product.id);
                 if (mounted) {
@@ -141,9 +145,9 @@ class _MyProductsPageState extends ConsumerState<MyProductsPage> {
           }
 
           final allProducts = snapshot.data ?? [];
-          // Filter to only show products posted by the current user (using businessName)
+          // Filter to only show products posted by the current user (using businessId)
           final myProducts = profile != null 
-              ? allProducts.where((p) => p.seller == profile.businessName).toList()
+              ? allProducts.where((p) => p.businessId == profile.id).toList()
               : <Product>[];
 
           if (myProducts.isEmpty) {
@@ -243,9 +247,11 @@ class _MyProductsPageState extends ConsumerState<MyProductsPage> {
                             ),
                           ],
                         ),
-                        Divider(height: 1, color: AppColors.mintGreen.withOpacity(0.5)),
-                        Padding(
+                        Container(
                           padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
+                          decoration: BoxDecoration(
+                            color: AppColors.mintGreen.withOpacity(0.1),
+                          ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [

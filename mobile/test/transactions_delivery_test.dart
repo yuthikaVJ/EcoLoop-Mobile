@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:eco_loop/features/transactions_delivery/presentation/pages/location_picker_page.dart';
 
 void main() {
-  testWidgets('Start Transaction opens confirmation and quantity form', (
+  testWidgets('Make an Offer opens the offer form with quantity and price', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -32,11 +32,13 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('Start Transaction'));
+    await tester.tap(find.text('Make an Offer'));
     await tester.pumpAndSettle();
-    expect(find.text('Confirm Transaction'), findsOneWidget);
-    expect(find.byType(TextFormField), findsOneWidget);
-    expect(find.text('Submit Request'), findsOneWidget);
+    expect(find.text('Make an Offer'), findsOneWidget);
+    // Quantity and the offered price, which starts at the asking price.
+    expect(find.byType(TextFormField), findsNWidgets(2));
+    expect(find.widgetWithText(TextFormField, '450'), findsOneWidget);
+    expect(find.text('Send Offer'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

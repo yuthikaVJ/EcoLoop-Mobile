@@ -83,9 +83,13 @@ class _ActivityListState extends State<_ActivityList> {
     _reload();
   }
 
-  void _reload() => _items = widget.order
-      ? _api.getProductOrders(seller: widget.seller, page: _page)
-      : _api.getMaterialTransactions(seller: widget.seller, page: _page);
+  // Block body on purpose: an arrow (`=> _items = ...`) would return the
+  // Future, and setState(_reload) throws if its callback returns a Future.
+  void _reload() {
+    _items = widget.order
+        ? _api.getProductOrders(seller: widget.seller, page: _page)
+        : _api.getMaterialTransactions(seller: widget.seller, page: _page);
+  }
 
   @override
   Widget build(BuildContext context) => FutureBuilder<List<dynamic>>(

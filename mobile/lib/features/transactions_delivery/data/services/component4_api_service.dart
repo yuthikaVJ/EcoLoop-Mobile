@@ -311,7 +311,9 @@ class Component4ApiService {
   Future<List<SellerDeliveryJob>> getMyDeliveries({
     bool includeFinished = false,
   }) async {
-    final body = await _get('/deliveries/mine?includeFinished=$includeFinished');
+    final body = await _get(
+      '/deliveries/mine?includeFinished=$includeFinished',
+    );
     return (body['items'] as List)
         .map((x) => SellerDeliveryJob.fromJson(x as Map<String, dynamic>))
         .toList();

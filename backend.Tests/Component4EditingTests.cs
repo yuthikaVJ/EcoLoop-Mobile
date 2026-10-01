@@ -45,10 +45,36 @@ public class Component4EditingTests
         request.Delivery.Location = "Supplier pickup address";
         var service = new MaterialTransactionService(c.Db);
         var created = (await service.CreateAsync(request)).Data!;
-        foreach (var next in new[] { MaterialTransactionStatus.Accepted, MaterialTransactionStatus.Processing, MaterialTransactionStatus.Ready, MaterialTransactionStatus.Completed })
+        // The requester (listing owner, the buyer) answers the offer; the supplier fulfils it.
+        Assert.NotNull((await service.ChangeStatusAsync(created.Id, c.Buyer.Id, MaterialTransactionStatus.Accepted, null)).Data);
+        foreach (var next in new[] { MaterialTransactionStatus.Processing, MaterialTransactionStatus.Ready, MaterialTransactionStatus.Completed })
             Assert.NotNull((await service.ChangeStatusAsync(created.Id, c.Seller.Id, next, null)).Data);
         Assert.Null((await service.ChangeStatusAsync(created.Id, c.Buyer.Id, MaterialTransactionStatus.Cancelled, null)).Data);
         Assert.Equal(5, (await service.GetByIdAsync(created.Id))!.StatusHistory.Count);
+    }
+
+    [Fact]
+    public async Task INeedOffer_SupplierSetsPriceAndDelivery_OnlyRequesterAccepts()
+    {
+        await using var c = await Component4TestContext.CreateAsync();
+        var listing = await c.AddListingAsync(type: ListingType.INeed); // sellerDelivery: false
+        var service = new MaterialTransactionService(c.Db);
+
+        var noPickupAddress = Request(c, listing);
+        Assert.Contains("pickup location", (await service.CreateAsync(noPickupAddress)).Error);
+
+        var request = Request(c, listing);
+        request.UnitPrice = 42;
+        request.Delivery = new() { Method = (int)DeliveryMethod.SellerDelivery, Location = "Requester yard" };
+        var created = (await service.CreateAsync(request)).Data!;
+        Assert.Equal((int)DeliveryMethod.SellerDelivery, created.Delivery!.Method);
+        Assert.Equal("Requester yard", created.Delivery.Location);
+        Assert.Equal(42m, created.UnitPrice);
+        Assert.Equal((int)ListingType.INeed, created.ListingType);
+        Assert.Equal(c.Seller.Id, created.StatusHistory.Single().ChangedByBusinessId);
+
+        Assert.Null((await service.ChangeStatusAsync(created.Id, c.Seller.Id, MaterialTransactionStatus.Accepted, null)).Data);
+        Assert.NotNull((await service.ChangeStatusAsync(created.Id, c.Buyer.Id, MaterialTransactionStatus.Accepted, null)).Data);
     }
 
     private static CreateMaterialTransactionRequest Request(Component4TestContext c, MaterialListing listing) => new()

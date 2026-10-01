@@ -39,9 +39,13 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
     super.dispose();
   }
 
-  void _reload() => _details = widget.order
-      ? _api.getProductOrder(widget.id)
-      : _api.getMaterialTransaction(widget.id);
+  // Block body on purpose: an arrow (`=> _details = ...`) would return the
+  // Future, and setState(_reload) throws if its callback returns a Future.
+  void _reload() {
+    _details = widget.order
+        ? _api.getProductOrder(widget.id)
+        : _api.getMaterialTransaction(widget.id);
+  }
 
   Future<void> _action(String action) async {
     setState(() => _acting = true);
@@ -100,7 +104,17 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
     final List<StatusHistoryEntry> history = details.statusHistory;
     final sellerId = details.sellerBusinessId as String;
     final isSeller = sellerId == Component4Config.currentBusinessId;
+    final isBuyer =
+        details.buyerBusinessId == Component4Config.currentBusinessId;
     final status = details.statusName as String;
+    // An offer to supply an "I Need" listing (price, method and location set by
+    // the supplier) is answered by the requester, i.e. the buyer; otherwise
+    // the seller answers.
+    final isRequest =
+        !isOrder && (details as MaterialTransactionDetails).isRequest;
+    final isResponder = isRequest ? isBuyer : isSeller;
+    final isInitiator = isRequest ? isSeller : isBuyer;
+    final isDelivery = delivery?.method == DeliveryMethod.sellerDelivery;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -122,21 +136,27 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                _row('Buyer', details.buyer),
-                _row('Seller', details.seller),
+                _row(isRequest ? 'Requester' : 'Buyer', details.buyer),
+                _row(isRequest ? 'Supplier' : 'Seller', details.seller),
                 if (!isOrder)
                   _row('Quantity', '${details.quantity} ${details.unit}'),
                 if (!isOrder)
-                  _row('Unit price', details.unitPrice.toStringAsFixed(2)),
+                  _row(
+                    'Offered price',
+                    '\$${details.unitPrice.toStringAsFixed(2)} / ${details.unit}',
+                  ),
                 _row('Total', '\$${details.totalAmount.toStringAsFixed(2)}'),
                 _row(
                   'Method',
-                  delivery?.method == DeliveryMethod.sellerDelivery
-                      ? 'Seller Delivery'
+                  isDelivery
+                      ? (isRequest ? 'Supplier delivers' : 'Seller Delivery')
                       : 'Self Pickup',
                 ),
                 if (delivery?.location?.isNotEmpty == true)
-                  _row('Location', delivery!.location!),
+                  _row(
+                    isDelivery ? 'Deliver to' : 'Pickup at',
+                    delivery!.location!,
+                  ),
                 if (delivery?.method == DeliveryMethod.sellerDelivery)
                   _row('Delivery', _progressText(delivery!)),
               ],
@@ -192,9 +212,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
             ),
           ),
         ],
-        if (!isOrder &&
-            status == 'Pending' &&
-            details.buyerBusinessId == Component4Config.currentBusinessId)
+        if (!isOrder && status == 'Pending' && isInitiator)
           OutlinedButton(
             onPressed: _acting
                 ? null
@@ -209,7 +227,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
                     );
                     if (saved == true && mounted) setState(_reload);
                   },
-            child: const Text('Edit Request'),
+            child: const Text('Edit Offer'),
           ),
         if (const {
               'Pending',
@@ -284,6 +302,7 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
             status,
             isSeller,
             delivery?.method ?? DeliveryMethod.selfPickup,
+            isResponder: isResponder,
           ).map(
             (action) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -331,8 +350,9 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
   List<_DetailAction> _actions(
     String status,
     bool isSeller,
-    DeliveryMethod method,
-  ) {
+    DeliveryMethod method, {
+    required bool isResponder,
+  }) {
     final actions = <_DetailAction>[];
     if (widget.order) {
       if (isSeller && status == 'Placed') {
@@ -351,10 +371,12 @@ class _TransactionDetailPageState extends State<TransactionDetailPage> {
         actions.add(const _DetailAction('Complete Pickup', 'complete'));
       }
     } else {
-      if (isSeller && status == 'Pending') {
-        actions.add(const _DetailAction('Accept Request', 'accept'));
+      // The listing owner accepts or rejects an offer: the seller of an
+      // "I Have" listing, the requester of an "I Need" one.
+      if (isResponder && status == 'Pending') {
+        actions.add(const _DetailAction('Accept Offer', 'accept'));
         actions.add(
-          const _DetailAction('Reject Request', 'reject', destructive: true),
+          const _DetailAction('Reject Offer', 'reject', destructive: true),
         );
       }
       if (isSeller && status == 'Accepted') {

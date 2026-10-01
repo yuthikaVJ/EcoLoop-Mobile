@@ -120,12 +120,15 @@ class MyListingCard extends StatelessWidget {
             ),
           ),
           
-          // Action Buttons Divider
-          Divider(height: 1, color: AppColors.mintGreen.withOpacity(0.5)),
-          
-          // Action Buttons Row
-          Padding(
+          Container(
             padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
+            decoration: BoxDecoration(
+              color: AppColors.mintGreen.withOpacity(0.1),
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(12),
+                bottomRight: Radius.circular(12),
+              ),
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [

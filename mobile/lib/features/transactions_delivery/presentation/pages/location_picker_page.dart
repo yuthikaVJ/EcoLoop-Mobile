@@ -51,12 +51,8 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       _locationController.text = placeholder;
       _resolvingName = true;
     });
-    String? name;
-    try {
-      name = await _api.reverseGeocode(point.latitude, point.longitude);
-    } catch (_) {
-      // No address (e.g. the sea) or lookup unavailable: keep the coordinates.
-    }
+    // Backend first, then the phone's own geocoder (see placeName).
+    final name = await placeName(_api, point);
     if (!mounted || _selected != point) return;
     setState(() {
       _resolvingName = false;
@@ -65,21 +61,29 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         _locationController.text = name;
       }
     });
+    if (name == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Couldn't find an address name here; using the map coordinates.",
+          ),
+        ),
+      );
+    }
   }
 
   /// Puts a saved place name (not coordinates) back on the map.
   Future<void> _locateInitial(String name) async {
-    try {
-      final (lat, lng) = await _api.geocode(name);
-      if (!mounted || _locationController.text.trim() != name) return;
-      setState(() {
-        _selected = LatLng(lat, lng);
-        _hasCoordinates = true;
-      });
-      _moveMap(_selected, 15);
-    } catch (_) {
-      // Unknown place: the text is still usable, just without a pin.
+    final point = await placeCoordinates(_api, name);
+    // Unknown place: the text is still usable, just without a pin.
+    if (point == null || !mounted || _locationController.text.trim() != name) {
+      return;
     }
+    setState(() {
+      _selected = point;
+      _hasCoordinates = true;
+    });
+    _moveMap(_selected, 15);
   }
 
   LatLng? _coordinates(String? value) => parseCoordinates(value);
@@ -143,12 +147,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
 
   Future<void> _useCurrentLocation() async {
     setState(() => _locating = true);
+    LatLng? point;
     try {
       final position = await currentPosition();
-      if (!mounted) return;
-      final point = LatLng(position.latitude, position.longitude);
-      _moveMap(point, 15);
-      await _selectPoint(point);
+      point = LatLng(position.latitude, position.longitude);
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -158,6 +160,11 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     } finally {
       if (mounted) setState(() => _locating = false);
     }
+    if (point == null || !mounted) return;
+    // The spinner stops as soon as we have a position; the address field shows
+    // "Finding address..." while the place name loads.
+    _moveMap(point, 15);
+    await _selectPoint(point);
   }
 
   @override

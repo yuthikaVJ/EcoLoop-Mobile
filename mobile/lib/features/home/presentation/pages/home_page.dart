@@ -7,6 +7,49 @@ import '../../../materials_marketplace/presentation/pages/material_details_page.
 import '../../../materials_marketplace/presentation/providers/material_listings_provider.dart';
 import '../../../materials_marketplace/presentation/pages/add_material_page.dart';
 import '../../../profile/presentation/providers/profile_provider.dart';
+import '../../../../core/config/app_config.dart';
+import '../../../sustainable_products/data/product_repository.dart';
+import '../../../sustainable_products/domain/entities/product.dart';
+import '../../../sustainable_products/presentation/pages/product_details_page.dart';
+import '../../../sustainable_products/presentation/widgets/product_image_widget.dart';
+import '../../../transactions_delivery/data/services/component4_api_service.dart';
+
+/// The signed-in business's real activity (replaces the old placeholder stats).
+class _HomeStats {
+  final int completedDeals;
+  final double sales;
+  const _HomeStats(this.completedDeals, this.sales);
+}
+
+final _homeStatsProvider = FutureProvider.autoDispose<_HomeStats>((ref) async {
+  final api = Component4ApiService();
+  try {
+    final transactions = await Future.wait([
+      api.getMaterialTransactions(seller: true),
+      api.getMaterialTransactions(seller: false),
+    ]);
+    final orders = await Future.wait([
+      api.getProductOrders(seller: true),
+      api.getProductOrders(seller: false),
+    ]);
+    bool done(String status) => status == 'Completed' || status == 'Delivered';
+    final completed = transactions.expand((list) => list).where((t) => done(t.statusName)).length +
+        orders.expand((list) => list).where((o) => done(o.statusName)).length;
+    final sales = transactions[0].where((t) => done(t.statusName)).fold<double>(0, (sum, t) => sum + t.totalAmount) +
+        orders[0].where((o) => done(o.statusName)).fold<double>(0, (sum, o) => sum + o.totalAmount);
+    return _HomeStats(completed, sales);
+  } finally {
+    api.dispose();
+  }
+});
+
+final _homeProductsProvider = FutureProvider.autoDispose<List<Product>>(
+  (ref) => ref.read(productRepositoryProvider).getProducts(),
+);
+
+String _compact(double value) => value >= 1000
+    ? '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}k'
+    : value.toStringAsFixed(0);
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key, this.onNavigate});
@@ -17,14 +60,33 @@ class HomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final listingsAsyncValue = ref.watch(activeListingsNotifierProvider);
     final profileAsyncValue = ref.watch(profileNotifierProvider);
-    
+    final statsAsync = ref.watch(_homeStatsProvider);
+    final productsAsync = ref.watch(_homeProductsProvider);
+
+    // "Listed" = my active material listings + my products.
+    final me = AppConfig.currentBusinessId;
+    final listed = (listingsAsyncValue.hasValue && productsAsync.hasValue)
+        ? '${listingsAsyncValue.value!.where((l) => l.businessId == me).length + productsAsync.value!.where((p) => p.businessId == me).length}'
+        : '–';
+    final completedDeals = statsAsync.hasValue ? '${statsAsync.value!.completedDeals}' : '–';
+    final sales = statsAsync.hasValue ? _compact(statsAsync.value!.sales) : '–';
+
     final rawName = profileAsyncValue.value?.businessName ?? 'Eco Warrior';
     final nameParts = rawName.split(' ').where((p) => p.isNotEmpty).toList();
     final displayName = nameParts.length > 2 ? '${nameParts[0]} ${nameParts[1]}' : rawName;
 
     return Scaffold(
       backgroundColor: AppColors.offWhite,
-      body: SingleChildScrollView(
+      body: RefreshIndicator(
+        color: AppColors.forestGreen,
+        onRefresh: () async {
+          ref.invalidate(activeListingsNotifierProvider);
+          ref.invalidate(_homeStatsProvider);
+          ref.invalidate(_homeProductsProvider);
+          await ref.read(_homeProductsProvider.future).catchError((_) => <Product>[]);
+        },
+        child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -147,20 +209,21 @@ class HomePage extends ConsumerWidget {
                               Icon(Icons.eco, color: AppColors.ecoGreen, size: 20),
                               SizedBox(width: 8),
                               Text(
-                                'Your Impact This Month',
+                                'Your Activity',
                                 style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.slateGray),
                               ),
                             ],
                           ),
                           const SizedBox(height: 16),
+                          // Real data for the signed-in business.
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
-                              _buildStatColumn('Recycled', '450', 'kg', Icons.recycling),
+                              _buildStatColumn('Listed', listed, '', Icons.recycling),
                               _buildStatDivider(),
-                              _buildStatColumn('Saved', '12', 'trees', Icons.park),
+                              _buildStatColumn('Completed', completedDeals, '', Icons.handshake_outlined),
                               _buildStatDivider(),
-                              _buildStatColumn('Earned', '\$1.2k', '', Icons.attach_money),
+                              _buildStatColumn('Sales', sales, '', Icons.payments_outlined),
                             ],
                           ),
                         ],
@@ -214,7 +277,8 @@ class HomePage extends ConsumerWidget {
                     'Track Order', 
                     Icons.local_shipping_rounded, 
                     AppColors.ecoGreen,
-                    onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Order tracking coming soon!'))),
+                    // Opens the Orders tab (transactions, orders, deliveries).
+                    onTap: () => onNavigate?.call(2),
                   ),
                 ],
               ),
@@ -244,17 +308,38 @@ class HomePage extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 12),
-            SizedBox(
-              height: 220,
-              child: listingsAsyncValue.when(
-                loading: () => const Center(child: CircularProgressIndicator(color: AppColors.forestGreen)),
-                error: (err, stack) => Center(child: Text('Error: $err')),
-                data: (allListings) {
-                  final recentItems = allListings.take(4).toList();
-                  if (recentItems.isEmpty) {
-                    return const Center(child: Text('No recent items'));
-                  }
-                  return ListView.builder(
+            listingsAsyncValue.when(
+              loading: () => const SizedBox(
+                height: 220,
+                child: Center(child: CircularProgressIndicator(color: AppColors.forestGreen)),
+              ),
+              error: (err, stack) => SizedBox(height: 80, child: Center(child: Text('Error: $err'))),
+              data: (allListings) {
+                final recentItems = allListings.take(4).toList();
+                if (recentItems.isEmpty) {
+                  // Compact empty state so the sections below stay on screen.
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: Text('No materials listed yet', style: TextStyle(color: AppColors.slateGray)),
+                        ),
+                        TextButton.icon(
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const AddMaterialPage()),
+                          ),
+                          icon: const Icon(Icons.add, color: AppColors.ecoGreen),
+                          label: const Text('Post the first material', style: TextStyle(color: AppColors.ecoGreen)),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return SizedBox(
+                  height: 220,
+                  child: ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     scrollDirection: Axis.horizontal,
                     physics: const BouncingScrollPhysics(),
@@ -262,12 +347,113 @@ class HomePage extends ConsumerWidget {
                     itemBuilder: (context, index) {
                       return _buildTrendingCard(context, recentItems[index]);
                     },
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 32),
+
+            // 5. Newest sustainable products
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'New Products',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.darkCharcoal),
+                  ),
+                  TextButton(
+                    onPressed: () => onNavigate?.call(1, topIndex: 0), // Marketplace → Products
+                    child: const Text('View All', style: TextStyle(color: AppColors.ecoGreen, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 200,
+              child: productsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator(color: AppColors.forestGreen)),
+                error: (err, stack) => Center(child: Text('Error: $err')),
+                data: (products) {
+                  final recent = products.take(6).toList();
+                  if (recent.isEmpty) {
+                    return const Center(child: Text('No products listed yet'));
+                  }
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: recent.length,
+                    itemBuilder: (context, index) => _buildProductCard(context, recent[index]),
                   );
                 },
               ),
             ),
-            
+
             const SizedBox(height: 40),
+          ],
+        ),
+      ),
+      ),
+    );
+  }
+
+  Widget _buildProductCard(BuildContext context, Product product) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ProductDetailsPage(productId: product.id)),
+      ),
+      child: Container(
+        width: 150,
+        margin: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.mintGreen),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              child: SizedBox(
+                height: 110,
+                width: double.infinity,
+                child: product.primaryImageUrl != null
+                    ? ProductImageWidget(imageUrl: product.primaryImageUrl)
+                    : const ColoredBox(
+                        color: AppColors.mintGreen,
+                        child: Icon(Icons.shopping_bag_outlined, color: AppColors.forestGreen, size: 40),
+                      ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.darkCharcoal),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'LKR ${product.price.toStringAsFixed(2)}',
+                    style: const TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                  Text(
+                    product.availableQuantity > 0 ? '${product.availableQuantity} in stock' : 'Out of stock',
+                    style: const TextStyle(color: AppColors.slateGray, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

@@ -19,7 +19,12 @@ class _SavedLocationsPageState extends State<SavedLocationsPage> {
     _reload();
   }
 
-  void _reload() => _locations = _api.getLocations();
+  // Block body on purpose: an arrow would return the Future, and
+  // setState(_reload) throws if its callback returns a Future.
+  void _reload() {
+    _locations = _api.getLocations();
+  }
+
   @override
   void dispose() {
     _api.dispose();

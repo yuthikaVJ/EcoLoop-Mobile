@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
-import '../../domain/entities/business_profile.dart';
+import '../../../business_hub/data/business_profile_session.dart';
+import '../../../business_hub/domain/entities/business_profile.dart';
+import '../../../business_hub/presentation/pages/business_hub_landing_page.dart';
+import '../../../business_hub/presentation/pages/create_business_profile_page.dart';
+import '../../../business_hub/presentation/providers/business_hub_providers.dart';
+import '../../domain/entities/account_profile.dart';
 import '../providers/profile_provider.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
@@ -13,15 +19,13 @@ class ProfilePage extends ConsumerStatefulWidget {
 
 class _ProfilePageState extends ConsumerState<ProfilePage> {
   final _formKey = GlobalKey<FormState>();
-  
+
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
   late TextEditingController _addressController;
-  late TextEditingController _industryController;
-  late TextEditingController _descController;
-  
+
   bool _isEditing = false;
-  BusinessProfile? _currentProfile;
+  AccountProfile? _currentProfile;
 
   @override
   void initState() {
@@ -29,8 +33,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     _nameController = TextEditingController();
     _phoneController = TextEditingController();
     _addressController = TextEditingController();
-    _industryController = TextEditingController();
-    _descController = TextEditingController();
   }
 
   @override
@@ -38,39 +40,33 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     _nameController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
-    _industryController.dispose();
-    _descController.dispose();
     super.dispose();
   }
 
-  void _populateControllers(BusinessProfile profile) {
+  void _populateControllers(AccountProfile profile) {
     if (_currentProfile?.id != profile.id || !_isEditing) {
       _currentProfile = profile;
       _nameController.text = profile.businessName;
       _phoneController.text = profile.phoneNumber ?? '';
       _addressController.text = profile.address ?? '';
-      _industryController.text = profile.industryType ?? '';
-      _descController.text = profile.description ?? '';
     }
   }
 
   Future<void> _saveProfile() async {
     if (_formKey.currentState!.validate() && _currentProfile != null) {
-      final updatedProfile = BusinessProfile(
+      final updatedProfile = AccountProfile(
         id: _currentProfile!.id,
-        businessName: _nameController.text,
+        businessName: _nameController.text.trim(),
         email: _currentProfile!.email,
         logoUrl: _currentProfile!.logoUrl,
         createdAt: _currentProfile!.createdAt,
         isVerified: _currentProfile!.isVerified,
-        phoneNumber: _phoneController.text,
-        address: _addressController.text,
-        industryType: _industryController.text,
-        description: _descController.text,
+        phoneNumber: _phoneController.text.trim(),
+        address: _addressController.text.trim(),
       );
 
       await ref.read(profileNotifierProvider.notifier).updateProfile(updatedProfile);
-      
+
       if (mounted) {
         setState(() {
           _isEditing = false;
@@ -80,6 +76,33 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         );
       }
     }
+  }
+
+  Future<void> _openCreateBusiness(String userId) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CreateBusinessProfilePage(currentUserId: userId),
+      ),
+    );
+    ref.invalidate(myBusinessProfilesProvider);
+  }
+
+  Future<void> _openBusinessHub(String userId, {BusinessProfile? switchTo}) async {
+    if (switchTo != null) {
+      await BusinessProfileSession().setActiveProfile(switchTo);
+    }
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BusinessHubLandingPage(currentUserId: userId),
+      ),
+    );
+    ref.invalidate(myBusinessProfilesProvider);
+  }
+
+  Future<void> _signOut() async {
+    await BusinessProfileSession().clearActiveProfile();
+    ref.read(authNotifierProvider.notifier).signOut();
   }
 
   @override
@@ -107,9 +130,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           ),
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              ref.read(authNotifierProvider.notifier).signOut();
-            },
+            onPressed: _signOut,
           ),
         ],
       ),
@@ -134,62 +155,50 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                               : null,
                           backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
                           child: profile.logoUrl == null
-                              ? Icon(Icons.business, size: 50, color: theme.colorScheme.primary)
+                              ? Icon(Icons.person, size: 50, color: theme.colorScheme.primary)
                               : null,
                         ),
                         const SizedBox(height: 16),
+                        Text(
+                          profile.businessName,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
                         Text(
                           profile.email ?? 'No email',
                           style: theme.textTheme.titleMedium?.copyWith(
                             color: Colors.grey[600],
                           ),
                         ),
-                        if (profile.isVerified)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: Chip(
-                              label: const Text('Verified Business'),
-                              backgroundColor: Colors.green.withOpacity(0.1),
-                              labelStyle: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
-                              avatar: const Icon(Icons.verified, color: Colors.green, size: 18),
-                            ),
-                          ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 32),
-                  const Text('Business Information', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text('Personal Information', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 16),
                   _buildTextField(
                     controller: _nameController,
-                    label: 'Business Name',
-                    icon: Icons.store,
+                    label: 'Full Name',
+                    icon: Icons.person_outline,
                     enabled: _isEditing,
-                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                   ),
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    controller: _industryController,
-                    label: 'Industry Type',
-                    icon: Icons.category,
-                    enabled: _isEditing,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    controller: _descController,
-                    label: 'Description',
-                    icon: Icons.description,
-                    enabled: _isEditing,
-                    maxLines: 3,
-                  ),
-                  const SizedBox(height: 32),
-                  const Text('Contact Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 16),
                   _buildTextField(
                     controller: _phoneController,
-                    label: 'Phone Number',
+                    label: 'Mobile Number',
                     icon: Icons.phone,
                     enabled: _isEditing,
+                    keyboardType: TextInputType.phone,
+                    validator: (v) {
+                      final value = v?.trim() ?? '';
+                      if (value.isEmpty) return null;
+                      return RegExp(r'^\d{10}$').hasMatch(value)
+                          ? null
+                          : 'Mobile number must be exactly 10 digits';
+                    },
                   ),
                   const SizedBox(height: 16),
                   _buildTextField(
@@ -197,6 +206,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     label: 'Address',
                     icon: Icons.location_on,
                     enabled: _isEditing,
+                    maxLines: 2,
                   ),
                   if (_isEditing)
                     Padding(
@@ -210,6 +220,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                         ),
                       ),
                     ),
+                  const SizedBox(height: 32),
+                  const Text('Business', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  _buildBusinessSection(profile.id),
                 ],
               ),
             ),
@@ -236,18 +250,148 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     );
   }
 
+  /// "Request Business Verification" until the account owns a business
+  /// profile, then a list of its businesses and a "Business Hub" button.
+  Widget _buildBusinessSection(String userId) {
+    final businesses = ref.watch(myBusinessProfilesProvider);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.offWhite,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.mintGreen, width: 1.5),
+      ),
+      child: businesses.when(
+        loading: () => const Center(
+          child: Padding(
+            padding: EdgeInsets.all(8),
+            child: CircularProgressIndicator(),
+          ),
+        ),
+        error: (err, _) => Column(
+          children: [
+            const Text(
+              'Could not load your businesses.',
+              style: TextStyle(color: AppColors.slateGray),
+            ),
+            TextButton(
+              onPressed: () => ref.invalidate(myBusinessProfilesProvider),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+        data: (list) => list.isEmpty
+            ? _buildNoBusiness(userId)
+            : _buildBusinessList(userId, list),
+      ),
+    );
+  }
+
+  Widget _buildNoBusiness(String userId) {
+    return Column(
+      children: [
+        const Icon(Icons.business_center, size: 40, color: AppColors.forestGreen),
+        const SizedBox(height: 12),
+        const Text(
+          'Own a business?',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.darkCharcoal),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Register your business and request eROC verification to buy and sell on the EcoLoop marketplace.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 13, color: AppColors.slateGray, height: 1.4),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: FilledButton.icon(
+            onPressed: () => _openCreateBusiness(userId),
+            icon: const Icon(Icons.verified_outlined),
+            label: const Text(
+              'Request Business Verification',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBusinessList(String userId, List<BusinessProfile> list) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final business in list)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: CircleAvatar(
+              backgroundColor: AppColors.mintGreen,
+              backgroundImage: business.logoUrl != null
+                  ? NetworkImage(
+                      ref.read(businessRepositoryProvider).apiClient.resolveUrl(business.logoUrl)!,
+                    )
+                  : null,
+              child: business.logoUrl == null
+                  ? const Icon(Icons.business, color: AppColors.forestGreen)
+                  : null,
+            ),
+            title: Text(
+              business.businessName,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(business.businessType),
+            trailing: _buildStatusChip(business),
+            onTap: () => _openBusinessHub(userId, switchTo: business),
+          ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 48,
+          child: FilledButton.icon(
+            onPressed: () => _openBusinessHub(userId),
+            icon: const Icon(Icons.storefront),
+            label: const Text(
+              'Business Hub',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatusChip(BusinessProfile business) {
+    final color = business.isVerified ? AppColors.forestGreen : AppColors.slateGray;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        business.isVerified ? 'Verified' : business.status,
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
+      ),
+    );
+  }
+
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
     required IconData icon,
     bool enabled = true,
     int maxLines = 1,
+    TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
       controller: controller,
       enabled: enabled,
       maxLines: maxLines,
+      keyboardType: keyboardType,
       validator: validator,
       decoration: InputDecoration(
         labelText: label,

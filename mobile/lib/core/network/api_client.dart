@@ -104,8 +104,8 @@ class ApiClient {
     }
     return response;
   }
-  Future<http.Response> delete(String path) async {
-    String url = _buildUrl(path, null);
+  Future<http.Response> delete(String path, {Map<String, dynamic>? queryParameters}) async {
+    String url = _buildUrl(path, queryParameters);
     var response = await http.delete(
       Uri.parse(url), 
       headers: await getAuthHeaders()
@@ -120,6 +120,45 @@ class ApiClient {
       }
     }
     return response;
+  }
+
+  /// Sends one file as multipart/form-data with the signed-in user's token.
+  Future<http.Response> uploadMultipart(
+    String path, {
+    required List<int> fileBytes,
+    required String filename,
+    required String fieldName,
+    Map<String, String>? fields,
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    final url = _buildUrl(path, queryParameters);
+
+    Future<http.Response> send() async {
+      final request = http.MultipartRequest('POST', Uri.parse(url));
+      final headers = await getAuthHeaders()..remove('Content-Type');
+      request.headers.addAll(headers);
+      if (fields != null) request.fields.addAll(fields);
+      request.files.add(
+        http.MultipartFile.fromBytes(fieldName, fileBytes, filename: filename),
+      );
+      return http.Response.fromStream(await request.send());
+    }
+
+    var response = await send();
+    if (response.statusCode == 401 && await _authRepository.refreshToken()) {
+      response = await send();
+    }
+    return response;
+  }
+
+  /// Turns a server-relative path such as `/uploads/...` into a full URL.
+  String? resolveUrl(String? pathOrUrl) {
+    if (pathOrUrl == null || pathOrUrl.trim().isEmpty) return null;
+    final trimmed = pathOrUrl.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    return trimmed.startsWith('/') ? '$baseUrl$trimmed' : '$baseUrl/$trimmed';
   }
 }
 

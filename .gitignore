@@ -61,3 +61,7 @@ backend/wwwroot/uploads/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# React / Node (admin web)
+admin_web/node_modules/
+admin_web/dist/

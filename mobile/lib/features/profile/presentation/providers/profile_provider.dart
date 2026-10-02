@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client_provider.dart';
-import '../../domain/entities/business_profile.dart';
+import '../../domain/entities/account_profile.dart';
 import '../../data/repositories/profile_repository.dart';
 
 final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
@@ -8,16 +8,16 @@ final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
   return ProfileRepository(apiClient);
 });
 
-class ProfileNotifier extends AsyncNotifier<BusinessProfile> {
+class ProfileNotifier extends AsyncNotifier<AccountProfile> {
   late ProfileRepository _repository;
 
   @override
-  Future<BusinessProfile> build() async {
+  Future<AccountProfile> build() async {
     _repository = ref.watch(profileRepositoryProvider);
     return _repository.getProfile();
   }
 
-  Future<void> updateProfile(BusinessProfile updatedProfile) async {
+  Future<void> updateProfile(AccountProfile updatedProfile) async {
     state = const AsyncValue.loading();
     try {
       final result = await _repository.updateProfile(updatedProfile);
@@ -28,6 +28,6 @@ class ProfileNotifier extends AsyncNotifier<BusinessProfile> {
   }
 }
 
-final profileNotifierProvider = AsyncNotifierProvider<ProfileNotifier, BusinessProfile>(() {
+final profileNotifierProvider = AsyncNotifierProvider<ProfileNotifier, AccountProfile>(() {
   return ProfileNotifier();
 });

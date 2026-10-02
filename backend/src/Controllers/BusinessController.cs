@@ -19,7 +19,7 @@ public class BusinessController : ControllerBase
     }
 
     [HttpGet("me")]
-    public async Task<ActionResult<BusinessProfileDto>> GetMyProfile()
+    public async Task<ActionResult<AccountProfileDto>> GetMyProfile()
     {
         var businessIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrEmpty(businessIdClaim) || !Guid.TryParse(businessIdClaim, out var businessId))
@@ -37,7 +37,7 @@ public class BusinessController : ControllerBase
     }
 
     [HttpPut("me")]
-    public async Task<ActionResult<BusinessProfileDto>> UpdateMyProfile([FromBody] UpdateBusinessProfileRequest request)
+    public async Task<ActionResult<AccountProfileDto>> UpdateMyProfile([FromBody] UpdateAccountProfileRequest request)
     {
         var businessIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrEmpty(businessIdClaim) || !Guid.TryParse(businessIdClaim, out var businessId))

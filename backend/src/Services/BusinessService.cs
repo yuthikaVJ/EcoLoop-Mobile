@@ -14,12 +14,12 @@ public class BusinessService : IBusinessService
         _context = context;
     }
 
-    public async Task<BusinessProfileDto?> GetProfileAsync(Guid businessId)
+    public async Task<AccountProfileDto?> GetProfileAsync(Guid businessId)
     {
         var business = await _context.Businesses.FindAsync(businessId);
         if (business == null) return null;
 
-        return new BusinessProfileDto
+        return new AccountProfileDto
         {
             Id = business.Id,
             BusinessName = business.BusinessName,
@@ -27,14 +27,12 @@ public class BusinessService : IBusinessService
             LogoUrl = business.LogoUrl,
             PhoneNumber = business.PhoneNumber,
             Address = business.Address,
-            IndustryType = business.IndustryType,
-            Description = business.Description,
             CreatedAt = business.CreatedAt,
             IsVerified = business.IsVerified
         };
     }
 
-    public async Task<BusinessProfileDto?> UpdateProfileAsync(Guid businessId, UpdateBusinessProfileRequest request)
+    public async Task<AccountProfileDto?> UpdateProfileAsync(Guid businessId, UpdateAccountProfileRequest request)
     {
         var business = await _context.Businesses.FindAsync(businessId);
         if (business == null) return null;
@@ -42,8 +40,6 @@ public class BusinessService : IBusinessService
         business.BusinessName = request.BusinessName;
         business.PhoneNumber = request.PhoneNumber;
         business.Address = request.Address;
-        business.IndustryType = request.IndustryType;
-        business.Description = request.Description;
 
         await _context.SaveChangesAsync();
 

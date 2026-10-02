@@ -69,6 +69,13 @@ public class EcoLoopDbContext : DbContext
             .HasIndex(inventory => inventory.ProductId)
             .IsUnique();
 
+        // ── Business Hub profile configuration ──
+        modelBuilder.Entity<Business>()
+            .HasIndex(b => b.RegistrationNumber);
+
+        modelBuilder.Entity<Business>()
+            .HasIndex(b => b.UserId);
+
         // ── MaterialListing configuration ──
         modelBuilder.Entity<MaterialListing>()
             .Property(listing => listing.Price)

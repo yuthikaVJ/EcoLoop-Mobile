@@ -35,6 +35,7 @@ builder.Services.AddScoped<IProductImageService, ProductImageService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IMaterialListingService, MaterialListingService>();
 builder.Services.AddScoped<IBusinessService, BusinessService>();
+builder.Services.AddScoped<IBusinessProfileService, BusinessProfileService>();
 builder.Services.AddScoped<IMaterialTransactionService, MaterialTransactionService>();
 builder.Services.AddScoped<IProductOrderService, ProductOrderService>();
 builder.Services.AddScoped<DeliveryLocationService>();

@@ -4,6 +4,6 @@ namespace EcoLoop.Api.Services.Interfaces;
 
 public interface IBusinessService
 {
-    Task<BusinessProfileDto?> GetProfileAsync(Guid businessId);
-    Task<BusinessProfileDto?> UpdateProfileAsync(Guid businessId, UpdateBusinessProfileRequest request);
+    Task<AccountProfileDto?> GetProfileAsync(Guid businessId);
+    Task<AccountProfileDto?> UpdateProfileAsync(Guid businessId, UpdateAccountProfileRequest request);
 }

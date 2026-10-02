@@ -1,0 +1,445 @@
+import 'edit_transaction_page.dart';
+import 'delivery_run_page.dart';
+import 'location_picker_page.dart';
+import 'my_deliveries_page.dart' show progressLabel;
+import 'package:flutter/material.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../data/services/component4_api_service.dart';
+import '../../domain/entities/transaction_models.dart';
+import '../widgets/status_badge.dart';
+import '../widgets/status_timeline.dart';
+
+class TransactionDetailPage extends StatefulWidget {
+  final String id;
+  final bool order;
+  const TransactionDetailPage({
+    super.key,
+    required this.id,
+    required this.order,
+  });
+
+  @override
+  State<TransactionDetailPage> createState() => _TransactionDetailPageState();
+}
+
+class _TransactionDetailPageState extends State<TransactionDetailPage> {
+  final _api = Component4ApiService();
+  late Future<dynamic> _details;
+  bool _acting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  @override
+  void dispose() {
+    _api.dispose();
+    super.dispose();
+  }
+
+  // Block body on purpose: an arrow (`=> _details = ...`) would return the
+  // Future, and setState(_reload) throws if its callback returns a Future.
+  void _reload() {
+    _details = widget.order
+        ? _api.getProductOrder(widget.id)
+        : _api.getMaterialTransaction(widget.id);
+  }
+
+  Future<void> _action(String action) async {
+    setState(() => _acting = true);
+    try {
+      await _api.performAction(
+        order: widget.order,
+        id: widget.id,
+        action: action,
+      );
+      if (mounted) setState(_reload);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _acting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: Text(widget.order ? 'Order Details' : 'Transaction Details'),
+    ),
+    body: FutureBuilder<dynamic>(
+      future: _details,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(snapshot.error.toString()),
+                TextButton(
+                  onPressed: () => setState(_reload),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
+        }
+        final details = snapshot.data;
+        return _buildDetails(context, details);
+      },
+    ),
+  );
+
+  Widget _buildDetails(BuildContext context, dynamic details) {
+    final isOrder = details is ProductOrderDetails;
+    final DeliveryInfo? delivery = details.delivery;
+    final List<StatusHistoryEntry> history = details.statusHistory;
+    final sellerId = details.sellerBusinessId as String;
+    final isSeller = sellerId == Component4Config.currentBusinessId;
+    final isBuyer =
+        details.buyerBusinessId == Component4Config.currentBusinessId;
+    final status = details.statusName as String;
+    // An offer to supply an "I Need" listing (price, method and location set by
+    // the supplier) is answered by the requester, i.e. the buyer; otherwise
+    // the seller answers.
+    final isRequest =
+        !isOrder && (details as MaterialTransactionDetails).isRequest;
+    final isResponder = isRequest ? isBuyer : isSeller;
+    final isInitiator = isRequest ? isSeller : isBuyer;
+    final isDelivery = delivery?.method == DeliveryMethod.sellerDelivery;
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        isOrder ? 'Product Order' : details.listingTitle,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    StatusBadge(status: status),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _row(isRequest ? 'Requester' : 'Buyer', details.buyer),
+                _row(isRequest ? 'Supplier' : 'Seller', details.seller),
+                if (!isOrder)
+                  _row('Quantity', '${details.quantity} ${details.unit}'),
+                if (!isOrder)
+                  _row(
+                    'Offered price',
+                    '\$${details.unitPrice.toStringAsFixed(2)} / ${details.unit}',
+                  ),
+                _row('Total', '\$${details.totalAmount.toStringAsFixed(2)}'),
+                _row(
+                  'Method',
+                  isDelivery
+                      ? (isRequest ? 'Supplier delivers' : 'Seller Delivery')
+                      : 'Self Pickup',
+                ),
+                if (delivery?.location?.isNotEmpty == true)
+                  _row(
+                    isDelivery ? 'Deliver to' : 'Pickup at',
+                    delivery!.location!,
+                  ),
+                if (delivery?.method == DeliveryMethod.sellerDelivery)
+                  _row('Delivery', _progressText(delivery!)),
+              ],
+            ),
+          ),
+        ),
+        // Seller Delivery: the seller drives it from "My Deliveries"; the buyer
+        // can see the seller's last shared position while it's on the way.
+        if (delivery?.method == DeliveryMethod.sellerDelivery &&
+            isSeller &&
+            status == 'Ready' &&
+            delivery!.progress != DeliveryProgress.delivered)
+          ElevatedButton.icon(
+            onPressed: _acting ? null : () => _openDelivery(delivery.id),
+            icon: const Icon(Icons.local_shipping_outlined),
+            label: Text(
+              delivery.progress == DeliveryProgress.onTheWay
+                  ? 'Continue delivery'
+                  : 'Open delivery',
+            ),
+          ),
+        if (delivery?.method == DeliveryMethod.sellerDelivery &&
+            !isSeller &&
+            delivery!.hasSellerPosition &&
+            delivery.progress == DeliveryProgress.onTheWay)
+          OutlinedButton.icon(
+            icon: const Icon(Icons.local_shipping),
+            label: const Text('See where the seller is'),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => LocationPickerPage(
+                  initialLocation:
+                      '${delivery.sellerLatitude!.toStringAsFixed(6)}, ${delivery.sellerLongitude!.toStringAsFixed(6)}',
+                  readOnly: true,
+                ),
+              ),
+            ),
+          ),
+        if (isOrder) ...[
+          const SizedBox(height: 16),
+          Text('Items', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          ...details.items.map<Widget>(
+            (ProductOrderItem item) => Card(
+              child: ListTile(
+                title: Text(item.productName),
+                subtitle: Text(
+                  '${item.quantity} × \$${item.unitPrice.toStringAsFixed(2)}',
+                ),
+                trailing: Text('\$${item.lineTotal.toStringAsFixed(2)}'),
+              ),
+            ),
+          ),
+        ],
+        if (!isOrder && status == 'Pending' && isInitiator)
+          OutlinedButton(
+            onPressed: _acting
+                ? null
+                : () async {
+                    final saved = await Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => EditTransactionPage(
+                          transaction: details as MaterialTransactionDetails,
+                        ),
+                      ),
+                    );
+                    if (saved == true && mounted) setState(_reload);
+                  },
+            child: const Text('Edit Offer'),
+          ),
+        if (const {
+              'Pending',
+              'Accepted',
+              'Processing',
+              'Placed',
+              'Confirmed',
+            }.contains(status) &&
+            (delivery?.method == DeliveryMethod.selfPickup
+                ? isSeller
+                : details.buyerBusinessId ==
+                      Component4Config.currentBusinessId))
+          OutlinedButton(
+            onPressed: _acting
+                ? null
+                : () async {
+                    final location = await Navigator.push<String>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => LocationPickerPage(
+                          initialLocation: delivery?.location,
+                        ),
+                      ),
+                    );
+                    if (location == null || !mounted) return;
+                    setState(() => _acting = true);
+                    try {
+                      await _api.updateLocation(
+                        order: widget.order,
+                        id: widget.id,
+                        location: location,
+                        updatedAt: details.updatedAt as String?,
+                      );
+                      if (mounted) setState(_reload);
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text(e.toString())));
+                      }
+                    } finally {
+                      if (mounted) setState(() => _acting = false);
+                    }
+                  },
+            child: Text(
+              delivery?.method == DeliveryMethod.selfPickup
+                  ? 'Edit Pickup Address'
+                  : 'Edit Delivery Destination',
+            ),
+          ),
+        if (delivery?.location?.isNotEmpty == true)
+          TextButton.icon(
+            icon: const Icon(Icons.map_outlined),
+            label: const Text('View location / route'),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => LocationPickerPage(
+                  initialLocation: delivery!.location,
+                  readOnly: true,
+                ),
+              ),
+            ),
+          ),
+        const SizedBox(height: 20),
+        Text('Status Timeline', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 12),
+        StatusTimeline(entries: history),
+        if (!_isTerminal(status)) ...[
+          const SizedBox(height: 12),
+          ..._actions(
+            status,
+            isSeller,
+            delivery?.method ?? DeliveryMethod.selfPickup,
+            isResponder: isResponder,
+          ).map(
+            (action) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: action.destructive
+                  ? OutlinedButton(
+                      onPressed: _acting ? null : () => _action(action.route),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.errorRed,
+                      ),
+                      child: Text(action.label),
+                    )
+                  : ElevatedButton(
+                      onPressed: _acting ? null : () => _action(action.route),
+                      child: Text(action.label),
+                    ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _row(String label, String value) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 90,
+          child: Text(
+            label,
+            style: const TextStyle(color: AppColors.slateGray),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  List<_DetailAction> _actions(
+    String status,
+    bool isSeller,
+    DeliveryMethod method, {
+    required bool isResponder,
+  }) {
+    final actions = <_DetailAction>[];
+    if (widget.order) {
+      if (isSeller && status == 'Placed') {
+        actions.add(const _DetailAction('Confirm Order', 'confirm'));
+      }
+      if (isSeller && status == 'Confirmed') {
+        actions.add(const _DetailAction('Start Processing', 'processing'));
+      }
+      if (isSeller && status == 'Processing') {
+        actions.add(const _DetailAction('Mark Ready', 'ready'));
+      }
+      // Seller Delivery is finished from the delivery screen ("Open delivery").
+      if (isSeller &&
+          status == 'Ready' &&
+          method == DeliveryMethod.selfPickup) {
+        actions.add(const _DetailAction('Complete Pickup', 'complete'));
+      }
+    } else {
+      // The listing owner accepts or rejects an offer: the seller of an
+      // "I Have" listing, the requester of an "I Need" one.
+      if (isResponder && status == 'Pending') {
+        actions.add(const _DetailAction('Accept Offer', 'accept'));
+        actions.add(
+          const _DetailAction('Reject Offer', 'reject', destructive: true),
+        );
+      }
+      if (isSeller && status == 'Accepted') {
+        actions.add(const _DetailAction('Start Processing', 'processing'));
+      }
+      if (isSeller && status == 'Processing') {
+        actions.add(const _DetailAction('Mark Ready', 'ready'));
+      }
+      // With Seller Delivery the seller finishes from the delivery screen; the
+      // buyer can still confirm receipt here.
+      if (status == 'Ready' &&
+          (method == DeliveryMethod.selfPickup || !isSeller)) {
+        actions.add(const _DetailAction('Complete Transaction', 'complete'));
+      }
+    }
+    actions.add(const _DetailAction('Cancel', 'cancel', destructive: true));
+    return actions;
+  }
+
+  String _progressText(DeliveryInfo delivery) {
+    final label = progressLabel(delivery.progress);
+    final at = delivery.sellerLocationAt;
+    return delivery.progress == DeliveryProgress.onTheWay && at != null
+        ? '$label (seller seen ${TimeOfDay.fromDateTime(at).format(context)})'
+        : label;
+  }
+
+  Future<void> _openDelivery(String deliveryId) async {
+    setState(() => _acting = true);
+    try {
+      final jobs = await _api.getMyDeliveries(includeFinished: true);
+      final job = jobs.where((j) => j.id == deliveryId).firstOrNull;
+      if (!mounted) return;
+      if (job == null) {
+        throw const Component4ApiException('This delivery is not available.');
+      }
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => DeliveryRunPage(job: job)),
+      );
+      if (mounted) setState(_reload);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _acting = false);
+    }
+  }
+
+  bool _isTerminal(String status) => const {
+    'Completed',
+    'Delivered',
+    'Cancelled',
+    'Rejected',
+  }.contains(status);
+}
+
+class _DetailAction {
+  final String label;
+  final String route;
+  final bool destructive;
+  const _DetailAction(this.label, this.route, {this.destructive = false});
+}

@@ -31,6 +31,7 @@ public class MaterialListingService : IMaterialListingService
         var query = _db.MaterialListings
             .AsNoTracking()
             .Include(listing => listing.Business)
+            .Include(listing => listing.PostedAsBusiness)
             .Where(listing => (int)listing.Status == status);
 
         if (businessId.HasValue)
@@ -79,6 +80,7 @@ public class MaterialListingService : IMaterialListingService
         return await _db.MaterialListings
             .AsNoTracking()
             .Include(listing => listing.Business)
+            .Include(listing => listing.PostedAsBusiness)
             .Where(listing => listing.BusinessId == businessId &&
                               listing.Status != EcoLoop.Api.Models.ListingStatus.Deleted)
             .OrderByDescending(listing => listing.CreatedAt)
@@ -99,12 +101,23 @@ public class MaterialListingService : IMaterialListingService
             Location = listing.Location,
             Price = listing.Price,
             PriceUnit = listing.PriceUnit,
-            Seller = listing.Business != null ? listing.Business.BusinessName : null,
-            SellerIsVerified = listing.Business != null && listing.Business.IsVerified,
+            PostedAsBusinessId = listing.PostedAsBusinessId,
+            Seller = listing.PostedAsBusiness != null
+                ? listing.PostedAsBusiness.BusinessName
+                : listing.Business != null ? listing.Business.BusinessName : null,
+            SellerLogoUrl = listing.PostedAsBusiness != null
+                ? listing.PostedAsBusiness.LogoUrl
+                : listing.Business != null ? listing.Business.LogoUrl : null,
+            SellerIsVerified = listing.PostedAsBusiness != null
+                ? listing.PostedAsBusiness.IsVerified
+                : listing.Business != null && listing.Business.IsVerified,
             Type = (int)listing.Type,
             Status = (int)listing.Status,
             CreatedAt = listing.CreatedAt,
             ImageUrl = listing.ImageUrl,
+            ImageUrls = listing.ImageUrls,
+            Availability = listing.Availability,
+            Condition = listing.Condition,
             SellerDeliveryAvailable = listing.SellerDeliveryAvailable
         };
 
@@ -113,6 +126,7 @@ public class MaterialListingService : IMaterialListingService
         return await _db.MaterialListings
             .AsNoTracking()
             .Include(listing => listing.Business)
+            .Include(listing => listing.PostedAsBusiness)
             .Where(listing => listing.Id == id && (int)listing.Status == 0)
             .Select(listing => new MaterialListingDetailsDto
             {
@@ -127,12 +141,23 @@ public class MaterialListingService : IMaterialListingService
                 Price = listing.Price,
                 PriceUnit = listing.PriceUnit,
                 DeliveryMethod = listing.DeliveryMethod,
-                Seller = listing.Business != null ? listing.Business.BusinessName : null,
-                SellerIsVerified = listing.Business != null && listing.Business.IsVerified,
+                PostedAsBusinessId = listing.PostedAsBusinessId,
+                Seller = listing.PostedAsBusiness != null
+                    ? listing.PostedAsBusiness.BusinessName
+                    : listing.Business != null ? listing.Business.BusinessName : null,
+                SellerLogoUrl = listing.PostedAsBusiness != null
+                    ? listing.PostedAsBusiness.LogoUrl
+                    : listing.Business != null ? listing.Business.LogoUrl : null,
+                SellerIsVerified = listing.PostedAsBusiness != null
+                    ? listing.PostedAsBusiness.IsVerified
+                    : listing.Business != null && listing.Business.IsVerified,
                 Type = (int)listing.Type,
                 Status = (int)listing.Status,
                 CreatedAt = listing.CreatedAt,
                 ImageUrl = listing.ImageUrl,
+                ImageUrls = listing.ImageUrls,
+                Availability = listing.Availability,
+                Condition = listing.Condition,
                 SellerDeliveryAvailable = listing.SellerDeliveryAvailable
             })
             .FirstOrDefaultAsync();
@@ -143,6 +168,9 @@ public class MaterialListingService : IMaterialListingService
         var listing = new EcoLoop.Api.Models.MaterialListing
         {
             BusinessId = request.BusinessId,
+            PostedAsBusinessId = request.PostedAsBusinessId,
+            Availability = Trimmed(request.Availability, 50),
+            Condition = Trimmed(request.Condition, 100),
             Title = request.Title,
             Category = request.Category,
             Description = request.Description,
@@ -156,6 +184,7 @@ public class MaterialListingService : IMaterialListingService
             Status = EcoLoop.Api.Models.ListingStatus.Active,
             CreatedAt = DateTime.UtcNow,
             ImageUrl = request.ImageUrl,
+            ImageUrls = request.ImageUrls,
             SellerDeliveryAvailable = request.SellerDeliveryAvailable
         };
 
@@ -183,12 +212,49 @@ public class MaterialListingService : IMaterialListingService
         listing.PriceUnit = request.PriceUnit;
         listing.DeliveryMethod = request.DeliveryMethod;
         listing.SellerDeliveryAvailable = request.SellerDeliveryAvailable;
+        if (request.Availability != null) listing.Availability = Trimmed(request.Availability, 50);
+        if (request.Condition != null) listing.Condition = Trimmed(request.Condition, 100);
+        if (request.KeepImageUrls != null)
+        {
+            // Only photos already on this listing can be kept (no arbitrary URLs).
+            var current = CurrentPhotos(listing);
+            var kept = request.KeepImageUrls.Where(current.Contains).Distinct().ToList();
+            listing.ImageUrls = kept;
+            listing.ImageUrl = kept.FirstOrDefault();
+        }
         listing.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
 
         return await GetByIdAsync(id);
     }
+
+    public async Task<int?> ImageCountAsync(Guid id)
+    {
+        var listing = await _db.MaterialListings.AsNoTracking().FirstOrDefaultAsync(l => l.Id == id && (int)l.Status == 0);
+        return listing == null ? null : CurrentPhotos(listing).Count;
+    }
+
+    public async Task<MaterialListingDetailsDto?> AddImagesAsync(Guid id, List<string> imageUrls)
+    {
+        var listing = await _db.MaterialListings.FirstOrDefaultAsync(l => l.Id == id && (int)l.Status == 0);
+        if (listing == null)
+            return null;
+
+        listing.ImageUrls = CurrentPhotos(listing).Concat(imageUrls).ToList();
+        listing.ImageUrl = listing.ImageUrls.FirstOrDefault();
+        listing.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return await GetByIdAsync(id);
+    }
+
+    // Listings created before multiple photos only have ImageUrl.
+    private static List<string> CurrentPhotos(EcoLoop.Api.Models.MaterialListing listing) =>
+        listing.ImageUrls.Count > 0 ? [.. listing.ImageUrls]
+        : string.IsNullOrEmpty(listing.ImageUrl) ? [] : [listing.ImageUrl];
+
+    public async Task<Guid?> GetOwnerIdAsync(Guid id) =>
+        await _db.MaterialListings.Where(l => l.Id == id).Select(l => (Guid?)l.BusinessId).FirstOrDefaultAsync();
 
     public async Task<bool> ChangeStatusAsync(Guid id, int newStatus)
     {
@@ -208,5 +274,11 @@ public class MaterialListingService : IMaterialListingService
         await _db.SaveChangesAsync();
 
         return true;
+    }
+
+    private static string? Trimmed(string? text, int max)
+    {
+        var value = text?.Trim();
+        return string.IsNullOrEmpty(value) ? null : value.Length <= max ? value : value[..max];
     }
 }

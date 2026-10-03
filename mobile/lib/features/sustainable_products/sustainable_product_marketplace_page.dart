@@ -8,6 +8,7 @@ import 'presentation/pages/product_details_page.dart';
 import 'presentation/pages/add_product_page.dart';
 import 'presentation/pages/my_products_page.dart';
 import 'presentation/widgets/product_image_widget.dart';
+import '../../shared/widgets/seller_name.dart';
 
 class SustainableProductMarketplacePage extends ConsumerStatefulWidget {
   const SustainableProductMarketplacePage({super.key});
@@ -263,10 +264,10 @@ class _ProductCard extends StatelessWidget {
                         fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                   const SizedBox(height: 3),
-                  Text(
-                    product.category ?? 'Sustainable Product',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  SellerName(
+                    name: product.seller,
+                    verified: product.sellerIsVerified,
+                    badgeSize: 12,
                     style: const TextStyle(
                         color: AppColors.slateGray, fontSize: 11),
                   ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../business_hub/data/business_profile_session.dart';
@@ -276,6 +277,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               'Could not load your businesses.',
               style: TextStyle(color: AppColors.slateGray),
             ),
+            const SizedBox(height: 4),
+            Text(
+              err is ApiException && err.statusCode == 404
+                  ? 'The server does not have the Business Hub yet. Restart the backend with the latest code.'
+                  : err is ApiException
+                      ? err.message
+                      : 'Check your connection to the server.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12, color: AppColors.slateGray),
+            ),
             TextButton(
               onPressed: () => ref.invalidate(myBusinessProfilesProvider),
               child: const Text('Retry'),
@@ -364,7 +375,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   Widget _buildStatusChip(BusinessProfile business) {
-    final color = business.isVerified ? AppColors.forestGreen : AppColors.slateGray;
+    final color = business.isVerified
+        ? AppColors.forestGreen
+        : business.isRejected
+            ? AppColors.errorRed
+            : const Color(0xFF856404);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -372,7 +387,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
-        business.isVerified ? 'Verified' : business.status,
+        business.isVerified ? 'Verified' : business.isRejected ? 'Rejected' : 'Pending',
         style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
       ),
     );

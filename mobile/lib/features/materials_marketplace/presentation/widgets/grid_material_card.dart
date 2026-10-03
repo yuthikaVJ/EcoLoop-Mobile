@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/material_listing.dart';
 import '../../../sustainable_products/presentation/widgets/product_image_widget.dart';
+import '../../../../shared/widgets/seller_name.dart';
 
 class GridMaterialCard extends StatelessWidget {
   final MaterialListing listing;
@@ -76,6 +77,13 @@ class GridMaterialCard extends StatelessWidget {
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    SellerName(
+                      name: listing.companyName,
+                      verified: listing.isVerifiedSeller,
+                      badgeSize: 12,
+                      style: const TextStyle(color: AppColors.slateGray, fontSize: 11),
                     ),
                     const Spacer(),
                     Row(

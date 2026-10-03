@@ -172,9 +172,10 @@ void main() {
     expect(find.text('Eco Manufacturer'), findsWidgets);
     expect(find.text('Posts'), findsOneWidget);
 
-    // Verify Posts for GreenCycle are displayed
-    expect(find.text('I HAVE 500kg PET bottles'), findsOneWidget);
-    expect(find.text('I NEED cardboard materials'), findsOneWidget);
+    // Posts are the business's real listings; none exist without a server.
+    await tester.pumpAndSettle();
+    expect(find.text('No posts yet.'), findsOneWidget);
+    expect(find.text('I HAVE 500kg PET bottles'), findsNothing);
 
     // Clean up session
     await session.clearActiveProfile();

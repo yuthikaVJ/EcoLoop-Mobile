@@ -36,16 +36,65 @@ class _EditMaterialPageState extends ConsumerState<EditMaterialPage> {
   ];
   final List<String> _units = ['Tons', 'Kgs', 'Units', 'Bales'];
 
+  static const _maxImages = 10;
+  static const _availabilityOptions = ['Immediately', 'Within a week', 'Flexible'];
+
   final ImagePicker _picker = ImagePicker();
+  // Photos already on the listing that the user keeps, and newly picked ones.
+  late final List<String> _keptPhotos = [...widget.listing.uploadedPhotos];
   final List<XFile> _images = [];
+  String? _availability;
+  final _conditionController = TextEditingController();
+  bool _saving = false;
 
   Future<void> _pickImages() async {
-    final List<XFile> selectedImages = await _picker.pickMultiImage();
-    if (selectedImages.isNotEmpty) {
-      setState(() {
-        _images.addAll(selectedImages);
-      });
+    final remaining = _maxImages - _keptPhotos.length - _images.length;
+    if (remaining <= 0) {
+      _showMaxImagesMessage();
+      return;
     }
+    // Resized like on the add page: faster uploads, under the server limit.
+    final selectedImages = await _picker.pickMultiImage(
+      maxWidth: 1600,
+      maxHeight: 1600,
+      imageQuality: 80,
+      limit: remaining > 1 ? remaining : null,
+    );
+    if (selectedImages.isEmpty || !mounted) return;
+    setState(() => _images.addAll(selectedImages.take(remaining)));
+    if (selectedImages.length > remaining) _showMaxImagesMessage();
+  }
+
+  void _showMaxImagesMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('A listing can have up to $_maxImages photos.')),
+    );
+  }
+
+  Widget _photoTile(Widget image, VoidCallback onRemove) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 12.0),
+      child: Stack(
+        children: [
+          ClipRRect(borderRadius: BorderRadius.circular(12), child: SizedBox(width: 100, height: 100, child: image)),
+          Positioned(
+            right: 4,
+            top: 4,
+            child: GestureDetector(
+              onTap: onRemove,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: AppColors.white.withOpacity(0.9),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, size: 16, color: Colors.red),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -62,6 +111,8 @@ class _EditMaterialPageState extends ConsumerState<EditMaterialPage> {
     _deliveryOption = widget.listing.sellerDeliveryAvailable || widget.listing.deliveryMethod == 'Seller Delivery'
         ? 'Seller Delivery'
         : 'Self Pickup';
+    _availability = _availabilityOptions.contains(widget.listing.availability) ? widget.listing.availability : null;
+    _conditionController.text = widget.listing.condition ?? '';
   }
 
   @override
@@ -71,6 +122,7 @@ class _EditMaterialPageState extends ConsumerState<EditMaterialPage> {
     _quantityController.dispose();
     _priceController.dispose();
     _locationController.dispose();
+    _conditionController.dispose();
     super.dispose();
   }
 
@@ -116,44 +168,23 @@ class _EditMaterialPageState extends ConsumerState<EditMaterialPage> {
                               child: _buildPhotoPlaceholder(isAdd: true),
                             ),
                             const SizedBox(width: 12),
-                            ..._images.map((img) => Padding(
-                              padding: const EdgeInsets.only(right: 12.0),
-                              child: Stack(
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Image.file(
-                                      File(img.path),
-                                      width: 100,
-                                      height: 100,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                  Positioned(
-                                    right: 4,
-                                    top: 4,
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          _images.remove(img);
-                                        });
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.all(2),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.white.withOpacity(0.9),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(Icons.close, size: 16, color: Colors.red),
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                            for (final url in _keptPhotos)
+                              _photoTile(
+                                Image.network(
+                                  url,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined),
+                                ),
+                                () => setState(() => _keptPhotos.remove(url)),
                               ),
-                            )),
+                            for (final img in _images)
+                              _photoTile(
+                                Image.file(File(img.path), fit: BoxFit.cover),
+                                () => setState(() => _images.remove(img)),
+                              ),
                             // Empty placeholders if less than 2 images
-                            if (_images.length < 2)
-                              ...List.generate(2 - _images.length, (index) => Padding(
+                            if (_keptPhotos.length + _images.length < 2)
+                              ...List.generate(2 - _keptPhotos.length - _images.length, (index) => Padding(
                                 padding: const EdgeInsets.only(right: 12.0),
                                 child: _buildPhotoPlaceholder(),
                               )),
@@ -348,6 +379,31 @@ class _EditMaterialPageState extends ConsumerState<EditMaterialPage> {
                           ),
                         ],
                       ),
+
+                      // Optional details for AI matching
+                      _buildSectionTitle(_isIHave ? 'Available (optional)' : 'Needed (optional)'),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          for (final option in _availabilityOptions)
+                            ChoiceChip(
+                              label: Text(option),
+                              selected: _availability == option,
+                              selectedColor: AppColors.mintGreen,
+                              onSelected: (selected) =>
+                                  setState(() => _availability = selected ? option : null),
+                            ),
+                        ],
+                      ),
+                      _buildSectionTitle('Condition (optional)'),
+                      TextFormField(
+                        controller: _conditionController,
+                        maxLength: 100,
+                        decoration: const InputDecoration(
+                          hintText: 'e.g. Clean and sorted, mixed, baled',
+                          prefixIcon: Icon(Icons.fact_check_outlined, color: AppColors.slateGray),
+                        ),
+                      ),
                       
                       const SizedBox(height: 32), // Bottom padding
                     ],
@@ -372,8 +428,9 @@ class _EditMaterialPageState extends ConsumerState<EditMaterialPage> {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () async {
+                  onPressed: _saving ? null : () async {
                     if (_formKey.currentState!.validate()) {
+                      setState(() => _saving = true);
                       try {
                         final requestData = {
                           "title": _titleController.text,
@@ -388,11 +445,16 @@ class _EditMaterialPageState extends ConsumerState<EditMaterialPage> {
                           // Lets buyers choose Seller Delivery (the seller delivers; no EcoLoop fleet).
                           "sellerDeliveryAvailable": _deliveryOption == 'Seller Delivery',
                           "type": _isIHave ? 0 : 1, // 0 = I Have, 1 = I Need
+                          // Empty strings clear these optional details.
+                          "availability": _availability ?? '',
+                          "condition": _conditionController.text.trim(),
+                          "keepImageUrls": _keptPhotos,
                         };
 
                         await ref.read(activeListingsNotifierProvider.notifier).updateListing(
                           widget.listing.id,
                           requestData,
+                          newImages: [for (final image in _images) File(image.path)],
                         );
                         
                         if (mounted) {
@@ -404,13 +466,17 @@ class _EditMaterialPageState extends ConsumerState<EditMaterialPage> {
                       } catch (e) {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Failed to post: $e')),
+                            SnackBar(content: Text('Failed to update: $e')),
                           );
                         }
+                      } finally {
+                        if (mounted) setState(() => _saving = false);
                       }
                     }
                   },
-                  child: const Text('Update Listing', style: TextStyle(fontSize: 16)),
+                  child: _saving
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Update Listing', style: TextStyle(fontSize: 16)),
                 ),
               ),
             ),

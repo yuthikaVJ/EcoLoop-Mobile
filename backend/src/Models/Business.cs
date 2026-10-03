@@ -20,6 +20,12 @@ public class Business
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
     public bool IsVerified { get; set; }
+    // Business Hub verification: "Unverified" (awaiting admin review),
+    // "Verified" or "Rejected" (see VerificationNote for the reason).
     public string Status { get; set; } = "Unverified";
+    public string? VerificationNote { get; set; }
+    public DateTime? VerifiedAt { get; set; }
     public Guid? UserId { get; set; }
+    // Account rows only: grants access to the admin web (set in the database).
+    public bool IsAdmin { get; set; }
 }

@@ -6,6 +6,8 @@ import '../../data/product_repository.dart';
 import '../../domain/entities/product.dart';
 import '../widgets/product_image_widget.dart';
 import 'purchase_product_page.dart';
+import '../../../../shared/widgets/seller_name.dart';
+import '../../../../shared/widgets/image_carousel.dart';
 
 class ProductDetailsPage extends ConsumerWidget {
   final String productId;
@@ -52,14 +54,15 @@ class ProductDetailsPage extends ConsumerWidget {
               if (product.images.isNotEmpty)
                 SizedBox(
                   height: 260,
-                  child: PageView.builder(
-                    itemCount: product.images.length,
-                    itemBuilder: (context, index) {
-                      return ProductImageWidget(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: ImageCarousel(
+                      itemCount: product.images.length,
+                      itemBuilder: (context, index) => ProductImageWidget(
                         imageUrl: product.images[index],
                         fit: BoxFit.cover,
-                      );
-                    },
+                      ),
+                    ),
                   ),
                 )
               else
@@ -99,19 +102,12 @@ class ProductDetailsPage extends ConsumerWidget {
                 label: 'Available quantity',
                 value: product.availableQuantity.toString(),
               ),
-              _InfoRow(
-                label: 'Seller',
-                value: product.seller ?? 'Unknown seller',
+              const SizedBox(height: 8),
+              SellerTile(
+                name: product.seller,
+                verified: product.sellerIsVerified,
+                logoUrl: product.sellerLogoUrl,
               ),
-              if (product.sellerIsVerified)
-                const ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    Icons.verified,
-                    color: AppColors.forestGreen,
-                  ),
-                  title: Text('Verified seller'),
-                ),
               const SizedBox(height: 16),
               Text(
                 'Description',

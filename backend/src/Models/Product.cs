@@ -5,6 +5,8 @@ public class Product
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid CategoryId { get; set; }
     public Guid BusinessId { get; set; } 
+    // Verified Business Hub profile (owned by BusinessId) shown as the seller.
+    public Guid? PostedAsBusinessId { get; set; }
 
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
@@ -16,6 +18,7 @@ public class Product
 
     public ProductCategory? Category { get; set; }
     public Business? Business { get; set; }
+    public Business? PostedAsBusiness { get; set; }
     public Inventory? Inventory { get; set; }
     public List<ProductImage> Images { get; set; } = [];
     public List<ProductOrderItem> OrderItems { get; set; } = [];

@@ -9,6 +9,7 @@ import '../../features/transactions_delivery/presentation/pages/transactions_hub
 import 'marketplace_page.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'dart:convert';
+import '../../core/notifications/notification_router.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
@@ -45,6 +46,8 @@ class _AppShellState extends ConsumerState<AppShell> {
   void initState() {
     super.initState();
     _registerDeviceToken();
+    // After the first frame the navigator exists, so taps can open screens.
+    WidgetsBinding.instance.addPostFrameCallback((_) => NotificationRouter.start());
   }
 
   Future<void> _registerDeviceToken() async {

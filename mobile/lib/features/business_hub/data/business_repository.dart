@@ -91,49 +91,15 @@ class BusinessRepository {
     _decode(await apiClient.delete('/api/business-profiles/$id'));
   }
 
-  Future<List<BusinessPost>> getBusinessPosts(
-    String businessProfileId, {
-    String? businessName,
-  }) async {
-    try {
-      final response = await apiClient.get(
-        '/api/business-profiles/$businessProfileId/posts',
-      );
-
-      final items = _decode(response) as List<dynamic>? ?? [];
-      return items
-          .map((item) => BusinessPost.fromJson(item as Map<String, dynamic>))
-          .toList();
-    } catch (_) {
-      final nameLower = (businessName ?? '').toLowerCase();
-      if (nameLower.contains('greencycle') ||
-          nameLower.contains('eco') ||
-          nameLower.contains('recycle')) {
-        return [
-          BusinessPost(
-            id: 'post-1',
-            businessProfileId: businessProfileId,
-            title: 'I HAVE 500kg PET bottles',
-            content: 'Clean, baled post-consumer PET bottles ready for pickup or delivery.',
-            type: 'I HAVE',
-            materialCategory: 'Plastics',
-            quantity: '500kg',
-            createdAt: DateTime.now().subtract(const Duration(days: 2)),
-          ),
-          BusinessPost(
-            id: 'post-2',
-            businessProfileId: businessProfileId,
-            title: 'I NEED cardboard materials',
-            content: 'Looking for bulk corrugated cardboard bales for packaging reuse.',
-            type: 'I NEED',
-            materialCategory: 'Paper & Cardboard',
-            quantity: '1 Ton',
-            createdAt: DateTime.now().subtract(const Duration(days: 5)),
-          ),
-        ];
-      }
-      return [];
-    }
+  /// Active listings and products posted as this business.
+  Future<List<BusinessPost>> getBusinessPosts(String businessProfileId) async {
+    final response = await apiClient.get(
+      '/api/business-profiles/$businessProfileId/posts',
+    );
+    final items = _decode(response) as List<dynamic>? ?? [];
+    return items
+        .map((item) => BusinessPost.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   List<BusinessProfile> _decodeProfiles(http.Response response) {

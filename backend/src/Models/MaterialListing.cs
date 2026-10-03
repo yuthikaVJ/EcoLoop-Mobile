@@ -4,6 +4,8 @@ public class MaterialListing
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid BusinessId { get; set; }
+    // Verified Business Hub profile (owned by BusinessId) shown as the seller.
+    public Guid? PostedAsBusinessId { get; set; }
 
     public string Title { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;      // e.g. "PLASTICS", "PAPER", "METALS"
@@ -15,6 +17,10 @@ public class MaterialListing
     public string PriceUnit { get; set; } = string.Empty;      // e.g. "Ton", "Kg", "Unit"
     public string DeliveryMethod { get; set; } = string.Empty; // e.g. "Self Pickup", "Seller Delivery"
     public bool SellerDeliveryAvailable { get; set; }
+    // Optional details the AI matching uses: e.g. "Immediately", "Within a week", "Flexible".
+    public string? Availability { get; set; }
+    // e.g. "Clean, sorted", "Mixed", "Baled".
+    public string? Condition { get; set; }
 
     public ListingType Type { get; set; } = ListingType.IHave;
     public ListingStatus Status { get; set; } = ListingStatus.Active;
@@ -22,10 +28,14 @@ public class MaterialListing
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
     
+    // First photo, kept for screens that show a single thumbnail.
     public string? ImageUrl { get; set; }
+    // Every photo in display order (PostgreSQL text[]).
+    public List<string> ImageUrls { get; set; } = [];
 
     // Navigation
     public Business? Business { get; set; }
+    public Business? PostedAsBusiness { get; set; }
     public List<MaterialTransaction> Transactions { get; set; } = [];
 }
 

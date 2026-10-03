@@ -4,6 +4,7 @@ import '../../../transactions_delivery/data/services/component4_api_service.dart
 import '../../../transactions_delivery/presentation/pages/product_checkout_page.dart';
 import '../../../transactions_delivery/presentation/pages/transactions_hub_page.dart';
 import '../../domain/entities/product.dart';
+import '../../../../shared/widgets/seller_name.dart';
 
 class ProductsPage extends StatefulWidget {
   final Component4ApiService? api;
@@ -183,7 +184,7 @@ class _ProductCardState extends State<_ProductCard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(product.name, style: Theme.of(context).textTheme.titleLarge),
-            Text(product.seller ?? 'Seller'),
+            SellerName(name: product.seller, verified: product.sellerIsVerified),
             if (product.description.isNotEmpty) Text(product.description),
             const SizedBox(height: 8),
             Text(

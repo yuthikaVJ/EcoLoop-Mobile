@@ -8,6 +8,7 @@ class Product {
   final String? category;
   final String? seller;
   final bool sellerIsVerified;
+  final String? sellerLogoUrl;
   final int availableQuantity;
   final bool sellerDeliveryAvailable; // buyer may choose Seller Delivery
   final String? primaryImageUrl;
@@ -23,6 +24,7 @@ class Product {
     required this.category,
     required this.seller,
     required this.sellerIsVerified,
+    this.sellerLogoUrl,
     required this.availableQuantity,
     this.sellerDeliveryAvailable = false,
     required this.primaryImageUrl,
@@ -44,6 +46,7 @@ class Product {
       category: json['category'] as String?,
       seller: json['seller'] as String?,
       sellerIsVerified: json['sellerIsVerified'] as bool? ?? false,
+      sellerLogoUrl: json['sellerLogoUrl'] as String?,
       availableQuantity: (json['availableQuantity'] as num?)?.toInt() ?? 0,
       sellerDeliveryAvailable: json['sellerDeliveryAvailable'] as bool? ?? false,
       primaryImageUrl: json['primaryImageUrl'] as String? ??
@@ -77,6 +80,7 @@ class Product {
       category: category ?? this.category,
       seller: seller ?? this.seller,
       sellerIsVerified: sellerIsVerified ?? this.sellerIsVerified,
+      sellerLogoUrl: sellerLogoUrl,
       availableQuantity: availableQuantity ?? this.availableQuantity,
       sellerDeliveryAvailable:
           sellerDeliveryAvailable ?? this.sellerDeliveryAvailable,

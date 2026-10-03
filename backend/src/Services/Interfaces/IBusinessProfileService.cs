@@ -14,4 +14,6 @@ public interface IBusinessProfileService
     Task<BusinessProfileDto> DeleteImageAsync(Guid id, string imageType, Guid userId);
     Task DeleteAsync(Guid id, Guid userId);
     Task<List<BusinessPostDto>> GetPostsByBusinessIdAsync(Guid businessId);
+    // Throws unless userId owns the profile and an admin has verified it.
+    Task EnsureCanPostAsAsync(Guid userId, Guid businessProfileId);
 }

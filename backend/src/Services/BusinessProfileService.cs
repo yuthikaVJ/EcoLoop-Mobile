@@ -53,7 +53,7 @@ public class BusinessProfileService : IBusinessProfileService
             LogoUrl = string.IsNullOrWhiteSpace(request.LogoUrl) ? null : request.LogoUrl.Trim(),
             CoverPhotoUrl = string.IsNullOrWhiteSpace(request.CoverPhotoUrl) ? null : request.CoverPhotoUrl.Trim(),
             IsVerified = false,
-            Status = "Unverified",
+            Status = BusinessVerificationStatus.Unverified,
             UserId = userId,
             CreatedAt = DateTime.UtcNow
         };
@@ -127,10 +127,35 @@ public class BusinessProfileService : IBusinessProfileService
             business.CoverPhotoUrl = string.IsNullOrWhiteSpace(request.CoverPhotoUrl) ? null : request.CoverPhotoUrl.Trim();
         }
 
+        // Editing a rejected business resubmits it for admin review.
+        if (business.Status == BusinessVerificationStatus.Rejected)
+        {
+            business.Status = BusinessVerificationStatus.Unverified;
+            business.VerificationNote = null;
+        }
+
         business.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
         return MapToDto(business);
+    }
+
+    public async Task EnsureCanPostAsAsync(Guid userId, Guid businessProfileId)
+    {
+        var business = await HubProfiles()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(b => b.Id == businessProfileId);
+
+        if (business == null || business.UserId != userId)
+        {
+            throw new UnauthorizedAccessException("You can only post as a business you own.");
+        }
+
+        if (!business.IsVerified)
+        {
+            throw new InvalidOperationException(
+                $"\"{business.BusinessName}\" is not verified yet. An admin must approve it before you can post as this business.");
+        }
     }
 
     public async Task<BusinessProfileDto> UploadImageAsync(
@@ -240,43 +265,44 @@ public class BusinessProfileService : IBusinessProfileService
         await _db.SaveChangesAsync();
     }
 
+    // Active listings and products posted as this business, newest first.
     public async Task<List<BusinessPostDto>> GetPostsByBusinessIdAsync(Guid businessId)
     {
-        var business = await _db.Businesses.AsNoTracking().FirstOrDefaultAsync(b => b.Id == businessId);
-        if (business == null)
-        {
-            return new List<BusinessPostDto>();
-        }
-
-        var list = new List<BusinessPostDto>();
-        var nameLower = business.BusinessName.ToLowerInvariant();
-        if (nameLower.Contains("greencycle") || nameLower.Contains("eco") || nameLower.Contains("recycle"))
-        {
-            list.Add(new BusinessPostDto
+        var listings = await _db.MaterialListings
+            .AsNoTracking()
+            .Where(l => l.PostedAsBusinessId == businessId && l.Status == ListingStatus.Active)
+            .Select(l => new BusinessPostDto
             {
-                Id = Guid.NewGuid(),
+                Id = l.Id,
                 BusinessProfileId = businessId,
-                Title = "I HAVE 500kg PET bottles",
-                Content = "Clean, baled post-consumer PET bottles ready for pickup or delivery.",
-                Type = "I HAVE",
-                MaterialCategory = "Plastics",
-                Quantity = "500kg",
-                CreatedAt = DateTime.UtcNow.AddDays(-2)
-            });
-            list.Add(new BusinessPostDto
-            {
-                Id = Guid.NewGuid(),
-                BusinessProfileId = businessId,
-                Title = "I NEED cardboard materials",
-                Content = "Looking for bulk corrugated cardboard bales for packaging reuse.",
-                Type = "I NEED",
-                MaterialCategory = "Paper & Cardboard",
-                Quantity = "1 Ton",
-                CreatedAt = DateTime.UtcNow.AddDays(-5)
-            });
-        }
+                Title = l.Title,
+                Content = l.Description,
+                Type = l.Type == ListingType.INeed ? "I NEED" : "I HAVE",
+                MaterialCategory = l.Category,
+                Quantity = (l.Quantity + " " + l.Unit).Trim(),
+                CreatedAt = l.CreatedAt
+            })
+            .ToListAsync();
 
-        return list;
+        var products = await _db.Products
+            .AsNoTracking()
+            .Where(p => p.PostedAsBusinessId == businessId && p.IsActive)
+            .Select(p => new BusinessPostDto
+            {
+                Id = p.Id,
+                BusinessProfileId = businessId,
+                Title = p.Name,
+                Content = p.Description,
+                Type = "PRODUCT",
+                MaterialCategory = p.Category != null ? p.Category.Name : p.MaterialType,
+                Quantity = "LKR " + p.Price.ToString("0.00"),
+                CreatedAt = p.CreatedAt
+            })
+            .ToListAsync();
+
+        return listings.Concat(products)
+            .OrderByDescending(post => post.CreatedAt)
+            .ToList();
     }
 
     // Account rows (UserId == null) are not Business Hub profiles and must never
@@ -337,6 +363,8 @@ public class BusinessProfileService : IBusinessProfileService
             CoverPhotoUrl = b.CoverPhotoUrl,
             IsVerified = b.IsVerified,
             Status = b.Status,
+            VerificationNote = b.VerificationNote,
+            VerifiedAt = b.VerifiedAt,
             UserId = b.UserId,
             CreatedAt = b.CreatedAt,
             UpdatedAt = b.UpdatedAt

@@ -51,7 +51,7 @@ class BusinessProfileSession {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonStr = jsonEncode(profile.toJson());
+      final jsonStr = jsonEncode(profile.toStorageJson());
       await prefs.setString(_keyActiveProfile, jsonStr);
     } catch (e) {
       debugPrint('Error saving active profile to SharedPreferences: $e');

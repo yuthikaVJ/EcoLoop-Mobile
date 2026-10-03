@@ -13,6 +13,8 @@ class BusinessProfile {
   final String? coverPhotoUrl;
   final bool isVerified;
   final String status;
+  /// Admin's reason when [status] is 'Rejected'.
+  final String? verificationNote;
   final String? userId;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -32,6 +34,7 @@ class BusinessProfile {
     this.coverPhotoUrl,
     this.isVerified = false,
     this.status = 'Unverified',
+    this.verificationNote,
     this.userId,
     this.createdAt,
     this.updatedAt,
@@ -53,6 +56,7 @@ class BusinessProfile {
       coverPhotoUrl: json['coverPhotoUrl'] as String?,
       isVerified: json['isVerified'] as bool? ?? false,
       status: json['status'] as String? ?? 'Unverified',
+      verificationNote: json['verificationNote'] as String?,
       userId: json['userId']?.toString(),
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'].toString())
@@ -61,6 +65,28 @@ class BusinessProfile {
           ? DateTime.tryParse(json['updatedAt'].toString())
           : null,
     );
+  }
+
+  bool get isRejected => status == 'Rejected';
+
+  /// Human-readable verification state; 'Unverified' means awaiting review.
+  String get statusLabel => isVerified
+      ? 'Verified'
+      : isRejected
+          ? 'Rejected'
+          : 'Pending verification';
+
+  /// Every field, in the API's shape; used to persist the active profile.
+  Map<String, dynamic> toStorageJson() {
+    return {
+      ...toJson(),
+      'id': id,
+      'isVerified': isVerified,
+      'status': status,
+      if (verificationNote != null) 'verificationNote': verificationNote,
+      if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
+      if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
+    };
   }
 
   Map<String, dynamic> toJson() {
@@ -95,6 +121,7 @@ class BusinessProfile {
     String? coverPhotoUrl,
     bool? isVerified,
     String? status,
+    String? verificationNote,
     String? userId,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -114,6 +141,7 @@ class BusinessProfile {
       coverPhotoUrl: coverPhotoUrl ?? this.coverPhotoUrl,
       isVerified: isVerified ?? this.isVerified,
       status: status ?? this.status,
+      verificationNote: verificationNote ?? this.verificationNote,
       userId: userId ?? this.userId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

@@ -51,7 +51,20 @@ class _BusinessProfileDetailsPageState
   void initState() {
     super.initState();
     _profile = widget.profile;
+    _refreshProfile();
     _loadPosts();
+  }
+
+  /// Picks up changes made elsewhere, e.g. an admin approving verification.
+  Future<void> _refreshProfile() async {
+    try {
+      final latest = await _repository.getBusinessProfile(_profile.id);
+      if (latest == null || !mounted) return;
+      setState(() => _profile = latest);
+      if (_isActive) await BusinessProfileSession().setActiveProfile(latest);
+    } catch (_) {
+      // Keep showing the profile we already have.
+    }
   }
 
   Future<void> _loadPosts() async {
@@ -60,10 +73,7 @@ class _BusinessProfileDetailsPageState
     });
 
     try {
-      final posts = await _repository.getBusinessPosts(
-        _profile.id,
-        businessName: _profile.businessName,
-      );
+      final posts = await _repository.getBusinessPosts(_profile.id);
       if (mounted) {
         setState(() {
           _posts = posts;
@@ -691,9 +701,7 @@ class _BusinessProfileDetailsPageState
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  _profile.isVerified
-                                      ? 'Verified'
-                                      : _profile.status,
+                                  _profile.statusLabel,
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
@@ -708,6 +716,9 @@ class _BusinessProfileDetailsPageState
                         ],
                       ),
                       const SizedBox(height: 12),
+
+                      if (_isOwner && !_profile.isVerified)
+                        _buildVerificationNotice(),
 
                       // Bio / About section
                       if (_profile.bio != null && _profile.bio!.isNotEmpty) ...[
@@ -1200,6 +1211,45 @@ class _BusinessProfileDetailsPageState
             tooltip: 'Business Options',
             onSelected: _handleMenuOption,
             itemBuilder: (context) => _buildMenuItems(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Tells the owner where verification stands and what to do next.
+  Widget _buildVerificationNotice() {
+    final rejected = _profile.isRejected;
+    final color = rejected ? AppColors.errorRed : const Color(0xFF856404);
+    final note = _profile.verificationNote;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: rejected ? const Color(0xFFFDECEA) : const Color(0xFFFFF3CD),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.4)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            rejected ? Icons.error_outline : Icons.hourglass_empty_rounded,
+            size: 20,
+            color: color,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              rejected
+                  ? 'Verification was rejected${note != null && note.isNotEmpty ? ': $note' : '.'}\n'
+                      'Fix the details with Edit Profile to send it for review again.'
+                  : 'Waiting for an EcoLoop admin to verify this business. '
+                      'You can post listings and products as this business once it is verified.',
+              style: TextStyle(fontSize: 13, color: color, height: 1.4),
+            ),
           ),
         ],
       ),

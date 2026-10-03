@@ -8,6 +8,7 @@ class MyListingCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback? onMarkSold;
+  final VoidCallback? onFindMatches;
 
   const MyListingCard({
     super.key,
@@ -16,6 +17,7 @@ class MyListingCard extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     this.onMarkSold,
+    this.onFindMatches,
   });
 
   @override
@@ -129,7 +131,27 @@ class MyListingCard extends StatelessWidget {
                 bottomRight: Radius.circular(12),
               ),
             ),
-            child: Row(
+            child: Column(
+              children: [
+                if (isActive && onFindMatches != null)
+                  InkWell(
+                    onTap: onFindMatches,
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.auto_awesome, size: 18, color: AppColors.forestGreen),
+                          SizedBox(width: 6),
+                          Text(
+                            'Find matches with EcoLoop AI',
+                            style: TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 if (isActive)
@@ -157,6 +179,8 @@ class MyListingCard extends StatelessWidget {
                     icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
                     label: const Text('Remove History', style: TextStyle(color: Colors.redAccent)),
                   ),
+              ],
+            ),
               ],
             ),
           )

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../business_hub/presentation/widgets/post_as_selector.dart';
 import '../providers/material_listings_provider.dart';
 
 class AddMaterialPage extends ConsumerStatefulWidget {
@@ -28,6 +29,12 @@ class _AddMaterialPageState extends ConsumerState<AddMaterialPage> {
   String? _selectedCategory;
   String _selectedUnit = 'Tons';
   String _deliveryOption = 'Self Pickup';
+  // Optional details that help EcoLoop AI find better matches.
+  String? _availability;
+  final _conditionController = TextEditingController();
+  static const _availabilityOptions = ['Immediately', 'Within a week', 'Flexible'];
+  // Verified Business Hub profile to post as; null = personal account.
+  String? _postAsBusinessId = defaultPostAsBusinessId();
 
   final List<String> _categories = [
     'Plastics', 'Paper', 'Metals', 'Glass', 'E-Waste', 'Wood', 'Other'
@@ -37,13 +44,31 @@ class _AddMaterialPageState extends ConsumerState<AddMaterialPage> {
   final ImagePicker _picker = ImagePicker();
   final List<XFile> _images = [];
 
+  static const _maxImages = 10;
+
   Future<void> _pickImages() async {
-    final List<XFile> selectedImages = await _picker.pickMultiImage();
-    if (selectedImages.isNotEmpty) {
-      setState(() {
-        _images.addAll(selectedImages);
-      });
+    final remaining = _maxImages - _images.length;
+    if (remaining <= 0) {
+      _showMaxImagesMessage();
+      return;
     }
+    // Phone photos are often 3-8 MB; resizing keeps uploads fast and under
+    // the server's limit while still looking sharp on screen.
+    final selectedImages = await _picker.pickMultiImage(
+      maxWidth: 1600,
+      maxHeight: 1600,
+      imageQuality: 80,
+      limit: remaining > 1 ? remaining : null,
+    );
+    if (selectedImages.isEmpty || !mounted) return;
+    setState(() => _images.addAll(selectedImages.take(remaining)));
+    if (selectedImages.length > remaining) _showMaxImagesMessage();
+  }
+
+  void _showMaxImagesMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('A listing can have up to $_maxImages photos.')),
+    );
   }
 
   @override
@@ -59,6 +84,7 @@ class _AddMaterialPageState extends ConsumerState<AddMaterialPage> {
     _quantityController.dispose();
     _priceController.dispose();
     _locationController.dispose();
+    _conditionController.dispose();
     super.dispose();
   }
 
@@ -93,6 +119,11 @@ class _AddMaterialPageState extends ConsumerState<AddMaterialPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      PostAsSelector(
+                        value: _postAsBusinessId,
+                        onChanged: (id) => setState(() => _postAsBusinessId = id),
+                      ),
+
                       // Photo Upload Section
                       _buildSectionTitle('Photos'),
                       SingleChildScrollView(
@@ -336,6 +367,43 @@ class _AddMaterialPageState extends ConsumerState<AddMaterialPage> {
                           ),
                         ],
                       ),
+
+                      // Optional details for AI matching
+                      _buildSectionTitle(_isIHave ? 'Available (optional)' : 'Needed (optional)'),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          for (final option in _availabilityOptions)
+                            ChoiceChip(
+                              label: Text(option),
+                              selected: _availability == option,
+                              selectedColor: AppColors.mintGreen,
+                              onSelected: (selected) =>
+                                  setState(() => _availability = selected ? option : null),
+                            ),
+                        ],
+                      ),
+                      _buildSectionTitle('Condition (optional)'),
+                      TextFormField(
+                        controller: _conditionController,
+                        maxLength: 100,
+                        decoration: const InputDecoration(
+                          hintText: 'e.g. Clean and sorted, mixed, baled',
+                          prefixIcon: Icon(Icons.fact_check_outlined, color: AppColors.slateGray),
+                        ),
+                      ),
+                      Row(
+                        children: const [
+                          Icon(Icons.auto_awesome, size: 14, color: AppColors.ecoGreen),
+                          SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'EcoLoop AI uses these details to find matching posts for you.',
+                              style: TextStyle(fontSize: 12, color: AppColors.slateGray),
+                            ),
+                          ),
+                        ],
+                      ),
                       
                       const SizedBox(height: 32), // Bottom padding
                     ],
@@ -376,16 +444,23 @@ class _AddMaterialPageState extends ConsumerState<AddMaterialPage> {
                           // Lets buyers choose Seller Delivery (the seller delivers; no EcoLoop fleet).
                           "sellerDeliveryAvailable": _deliveryOption == 'Seller Delivery',
                           "type": _isIHave ? 0 : 1, // 0 = I Have, 1 = I Need
+                          if (_postAsBusinessId != null)
+                            "postedAsBusinessId": _postAsBusinessId,
+                          if (_availability != null) "availability": _availability,
+                          if (_conditionController.text.trim().isNotEmpty)
+                            "condition": _conditionController.text.trim(),
                         };
 
                         await ref.read(activeListingsNotifierProvider.notifier).addListing(
                           requestData,
-                          imageFile: _images.isNotEmpty ? File(_images.first.path) : null,
+                          imageFiles: [for (final image in _images) File(image.path)],
                         );
                         
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Listing posted successfully!')),
+                            const SnackBar(
+                              content: Text('Listing posted! EcoLoop AI is looking for matches - we\'ll notify you.'),
+                            ),
                           );
                           Navigator.pop(context);
                         }

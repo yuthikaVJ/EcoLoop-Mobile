@@ -18,4 +18,7 @@ public interface IMaterialListingService
     Task<MaterialListingDetailsDto> CreateAsync(CreateMaterialListingRequest request);
     Task<MaterialListingDetailsDto?> UpdateAsync(Guid id, UpdateMaterialListingRequest request);
     Task<bool> ChangeStatusAsync(Guid id, int newStatus);
+    Task<Guid?> GetOwnerIdAsync(Guid id);
+    Task<MaterialListingDetailsDto?> AddImagesAsync(Guid id, List<string> imageUrls);
+    Task<int?> ImageCountAsync(Guid id);
 }

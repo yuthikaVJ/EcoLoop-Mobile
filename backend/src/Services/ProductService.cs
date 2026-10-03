@@ -32,6 +32,7 @@ public class ProductService : IProductService
             .AsNoTracking()
             .Include(product => product.Category)
             .Include(product => product.Business)
+            .Include(product => product.PostedAsBusiness)
             .Include(product => product.Inventory)
             .Include(product => product.Images)
             .Where(product => product.IsActive);
@@ -82,11 +83,21 @@ public class ProductService : IProductService
                 Category = product.Category == null
                     ? null
                     : product.Category.Name,
-                Seller = product.Business == null
-                    ? null
-                    : product.Business.BusinessName,
-                SellerIsVerified = product.Business != null &&
-                                    product.Business.IsVerified,
+                PostedAsBusinessId = product.PostedAsBusinessId,
+                Seller = product.PostedAsBusiness != null
+                    ? product.PostedAsBusiness.BusinessName
+                    : product.Business == null
+                        ? null
+                        : product.Business.BusinessName,
+                SellerLogoUrl = product.PostedAsBusiness != null
+                    ? product.PostedAsBusiness.LogoUrl
+                    : product.Business == null
+                        ? null
+                        : product.Business.LogoUrl,
+                SellerIsVerified = product.PostedAsBusiness != null
+                    ? product.PostedAsBusiness.IsVerified
+                    : product.Business != null &&
+                      product.Business.IsVerified,
                 AvailableQuantity = product.Inventory == null
                     ? 0
                     : (product.Inventory.IsAvailable ? product.Inventory.Quantity : 0),
@@ -125,11 +136,21 @@ public class ProductService : IProductService
                 Category = product.Category == null
                     ? null
                     : product.Category.Name,
-                Seller = product.Business == null
-                    ? null
-                    : product.Business.BusinessName,
-                SellerIsVerified = product.Business != null &&
-                                    product.Business.IsVerified,
+                PostedAsBusinessId = product.PostedAsBusinessId,
+                Seller = product.PostedAsBusiness != null
+                    ? product.PostedAsBusiness.BusinessName
+                    : product.Business == null
+                        ? null
+                        : product.Business.BusinessName,
+                SellerLogoUrl = product.PostedAsBusiness != null
+                    ? product.PostedAsBusiness.LogoUrl
+                    : product.Business == null
+                        ? null
+                        : product.Business.LogoUrl,
+                SellerIsVerified = product.PostedAsBusiness != null
+                    ? product.PostedAsBusiness.IsVerified
+                    : product.Business != null &&
+                      product.Business.IsVerified,
                 AvailableQuantity = product.Inventory == null
                     ? 0
                     : (product.Inventory.IsAvailable ? product.Inventory.Quantity : 0),
@@ -149,6 +170,7 @@ public class ProductService : IProductService
         {
             CategoryId = request.CategoryId,
             BusinessId = request.BusinessId,
+            PostedAsBusinessId = request.PostedAsBusinessId,
             Name = request.Name,
             Description = request.Description,
             MaterialType = request.MaterialType,

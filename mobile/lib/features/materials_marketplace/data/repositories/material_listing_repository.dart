@@ -57,54 +57,33 @@ class MaterialListingRepository {
     }
   }
 
-  Future<MaterialListing> createListing(Map<String, dynamic> requestData, {File? imageFile}) async {
-    try {
-      var request = http.MultipartRequest('POST', Uri.parse(baseUrl));
-      
-      // Add text fields
+  Future<MaterialListing> createListing(
+    Map<String, dynamic> requestData, {
+    List<File> imageFiles = const [],
+  }) async {
+    // A multipart request can only be sent once, so build a fresh one per try.
+    Future<http.Response> send() async {
+      final request = http.MultipartRequest('POST', Uri.parse(baseUrl));
       requestData.forEach((key, value) {
         request.fields[key] = value.toString();
       });
-
-      // Add file if it exists
-      if (imageFile != null) {
-        request.files.add(await http.MultipartFile.fromPath(
-          'image',
-          imageFile.path,
-        ));
+      for (final file in imageFiles) {
+        request.files.add(await http.MultipartFile.fromPath('images', file.path));
       }
+      request.headers.addAll(await _apiClient.getAuthHeaders());
+      return http.Response.fromStream(await request.send());
+    }
 
-      final headers = await _apiClient.getAuthHeaders();
-      request.headers.addAll(headers);
-
-      var streamedResponse = await request.send();
-      var response = await http.Response.fromStream(streamedResponse);
-      
-      if (response.statusCode == 401) {
-        final refreshed = await _apiClient.refreshToken();
-        if (refreshed) {
-          // Re-create request since streams can only be read once
-          request = http.MultipartRequest('POST', Uri.parse(baseUrl));
-          requestData.forEach((key, value) {
-            request.fields[key] = value.toString();
-          });
-          if (imageFile != null) {
-            request.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
-          }
-          final newHeaders = await _apiClient.getAuthHeaders();
-          request.headers.addAll(newHeaders);
-          
-          streamedResponse = await request.send();
-          response = await http.Response.fromStream(streamedResponse);
-        }
+    try {
+      var response = await send();
+      if (response.statusCode == 401 && await _apiClient.refreshToken()) {
+        response = await send();
       }
 
       if (response.statusCode == 201) {
-        final data = jsonDecode(response.body);
-        return MaterialListing.fromJson(data);
-      } else {
-        throw Exception('Failed to create listing: ${response.body}');
+        return MaterialListing.fromJson(jsonDecode(response.body));
       }
+      throw Exception('Failed to create listing: ${response.body}');
     } catch (e) {
       throw Exception('Network error while creating listing: $e');
     }
@@ -126,6 +105,27 @@ class MaterialListingRepository {
     } catch (e) {
       throw Exception('Network error while updating listing: $e');
     }
+  }
+
+  /// Uploads extra photos for an existing listing (multipart "images" fields).
+  Future<MaterialListing> addImages(String id, List<File> imageFiles) async {
+    Future<http.Response> send() async {
+      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/$id/images'));
+      for (final file in imageFiles) {
+        request.files.add(await http.MultipartFile.fromPath('images', file.path));
+      }
+      request.headers.addAll(await _apiClient.getAuthHeaders());
+      return http.Response.fromStream(await request.send());
+    }
+
+    var response = await send();
+    if (response.statusCode == 401 && await _apiClient.refreshToken()) {
+      response = await send();
+    }
+    if (response.statusCode == 200) {
+      return MaterialListing.fromJson(jsonDecode(response.body));
+    }
+    throw Exception('Failed to add photos: ${response.body}');
   }
 
   Future<bool> changeStatus(String id, int newStatus) async {

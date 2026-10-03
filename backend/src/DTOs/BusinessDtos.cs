@@ -100,6 +100,8 @@ public class BusinessProfileDto
     public string? CoverPhotoUrl { get; set; }
     public bool IsVerified { get; set; }
     public string Status { get; set; } = "Unverified";
+    public string? VerificationNote { get; set; }
+    public DateTime? VerifiedAt { get; set; }
     public Guid? UserId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
@@ -111,7 +113,7 @@ public class BusinessPostDto
     public Guid BusinessProfileId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Content { get; set; }
-    public string Type { get; set; } = "I HAVE"; // "I HAVE" or "I NEED"
+    public string Type { get; set; } = "I HAVE"; // "I HAVE", "I NEED" or "PRODUCT"
     public string? MaterialCategory { get; set; }
     public string? Quantity { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

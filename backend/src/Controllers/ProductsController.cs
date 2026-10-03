@@ -9,10 +9,14 @@ namespace EcoLoop.Api.Controllers;
 public class ProductsController : ControllerBase
 {
     private readonly IProductService _service;
+    private readonly IBusinessProfileService _businessProfiles;
 
-    public ProductsController(IProductService service)
+    public ProductsController(
+        IProductService service,
+        IBusinessProfileService businessProfiles)
     {
         _service = service;
+        _businessProfiles = businessProfiles;
     }
 
     [HttpGet]
@@ -55,6 +59,27 @@ public class ProductsController : ControllerBase
     {
         if (request.Price < 0)
             return BadRequest("Price cannot be negative.");
+
+        if (request.PostedAsBusinessId.HasValue)
+        {
+            // Posting as a business needs the signed-in owner, not a body-supplied id.
+            if (User.Identity?.IsAuthenticated != true)
+                return Unauthorized(new { message = "Sign in to post as a business." });
+
+            request.BusinessId = User.BusinessId();
+            try
+            {
+                await _businessProfiles.EnsureCanPostAsAsync(request.BusinessId, request.PostedAsBusinessId.Value);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
 
         var product = await _service.CreateAsync(request);
 

@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/network/api_client_provider.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../business_hub/presentation/widgets/post_as_selector.dart';
 import '../../../profile/presentation/providers/profile_provider.dart';
 import '../../data/product_repository.dart';
 
@@ -29,6 +30,8 @@ class _AddProductPageState extends ConsumerState<AddProductPage> {
   bool _loadingCategories = true;
   bool _submitting = false;
   bool _sellerDelivery = false;
+  // Verified Business Hub profile to post as; null = personal account.
+  String? _postAsBusinessId = defaultPostAsBusinessId();
 
   final ImagePicker _picker = ImagePicker();
   final List<XFile> _images = [];
@@ -165,6 +168,7 @@ class _AddProductPageState extends ConsumerState<AddProductPage> {
         'price': double.parse(_priceController.text.trim()),
         'availableQuantity': int.parse(_stockController.text.trim()),
         'sellerDeliveryAvailable': _sellerDelivery,
+        if (_postAsBusinessId != null) 'postedAsBusinessId': _postAsBusinessId,
       });
 
       final productResponse = await apiClient.post('/api/products', body: productBody);
@@ -255,6 +259,11 @@ class _AddProductPageState extends ConsumerState<AddProductPage> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
+            PostAsSelector(
+              value: _postAsBusinessId,
+              onChanged: (id) => setState(() => _postAsBusinessId = id),
+            ),
+
             // Eco banner
             Container(
               padding: const EdgeInsets.all(14),

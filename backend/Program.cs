@@ -36,6 +36,13 @@ builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IMaterialListingService, MaterialListingService>();
 builder.Services.AddScoped<IBusinessService, BusinessService>();
 builder.Services.AddScoped<IBusinessProfileService, BusinessProfileService>();
+builder.Services.AddScoped<IBusinessVerificationService, BusinessVerificationService>();
+// Agentic AI material matching (Python service behind the backend).
+builder.Services.AddSingleton<EcoLoop.Api.Services.Matching.IMatchingQueue, EcoLoop.Api.Services.Matching.MatchingQueue>();
+builder.Services.AddScoped<EcoLoop.Api.Services.Matching.MatchingService>();
+builder.Services.AddScoped<EcoLoop.Api.Controllers.AiServiceKeyFilter>();
+builder.Services.AddHttpClient<EcoLoop.Api.Services.Matching.AiMatchingClient>(client => client.Timeout = TimeSpan.FromMinutes(3));
+builder.Services.AddHostedService<EcoLoop.Api.Services.Matching.MatchingWorker>();
 builder.Services.AddScoped<IMaterialTransactionService, MaterialTransactionService>();
 builder.Services.AddScoped<IProductOrderService, ProductOrderService>();
 builder.Services.AddScoped<DeliveryLocationService>();

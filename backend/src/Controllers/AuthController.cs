@@ -17,28 +17,75 @@ public class AuthController : ControllerBase
 {
     private readonly EcoLoopDbContext _db;
     private readonly IConfiguration _config;
+    private readonly IHttpClientFactory _httpClientFactory;
 
-    public AuthController(EcoLoopDbContext db, IConfiguration config)
+    public AuthController(EcoLoopDbContext db, IConfiguration config, IHttpClientFactory httpClientFactory)
     {
         _db = db;
         _config = config;
+        _httpClientFactory = httpClientFactory;
     }
 
     [HttpPost("google-login")]
-    public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request)
+    public Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request) =>
+        SignInWithGoogleIdTokenAsync(request.IdToken);
+
+    // Admin web: Google's account-chooser popup returns a one-time authorization
+    // code (redirect_uri "postmessage"), exchanged here using the admin web's own
+    // OAuth client (Authentication:Google:AdminWeb*), falling back to the main one.
+    [HttpPost("google-code")]
+    public async Task<IActionResult> GoogleCodeLogin([FromBody] GoogleCodeLoginRequest request)
+    {
+        var adminClientId = _config["Authentication:Google:AdminWebClientId"];
+        var useAdminClient = !string.IsNullOrWhiteSpace(adminClientId);
+        var clientId = useAdminClient ? adminClientId! : _config["Authentication:Google:ClientId"]!;
+        var clientSecret = useAdminClient
+            ? _config["Authentication:Google:AdminWebClientSecret"]!
+            : _config["Authentication:Google:ClientSecret"]!;
+
+        var client = _httpClientFactory.CreateClient();
+        using var response = await client.PostAsync("https://oauth2.googleapis.com/token", new FormUrlEncodedContent(
+            new Dictionary<string, string>
+            {
+                ["code"] = request.Code,
+                ["client_id"] = clientId,
+                ["client_secret"] = clientSecret,
+                ["redirect_uri"] = "postmessage",
+                ["grant_type"] = "authorization_code",
+            }));
+
+        if (!response.IsSuccessStatusCode)
+            return Unauthorized(new { message = "Google rejected the sign-in code. Please try again." });
+
+        var tokens = await response.Content.ReadFromJsonAsync<GoogleTokenResponse>();
+        if (string.IsNullOrEmpty(tokens?.IdToken))
+            return Unauthorized(new { message = "Google did not return an ID token." });
+
+        return await SignInWithGoogleIdTokenAsync(tokens.IdToken);
+    }
+
+    private async Task<IActionResult> SignInWithGoogleIdTokenAsync(string idToken)
     {
         try
         {
+            // Tokens come from the mobile app's client or the admin web's client.
+            var audiences = new List<string> { _config["Authentication:Google:ClientId"]! };
+            var adminClientId = _config["Authentication:Google:AdminWebClientId"];
+            if (!string.IsNullOrWhiteSpace(adminClientId)) audiences.Add(adminClientId);
+
             var settings = new GoogleJsonWebSignature.ValidationSettings()
             {
-                Audience = new List<string>() { _config["Authentication:Google:ClientId"]! }
+                Audience = audiences
             };
 
             // This validates the token cryptographically with Google's public keys
-            var payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken, settings);
+            var payload = await GoogleJsonWebSignature.ValidateAsync(idToken, settings);
 
-            // Check if business exists with this GoogleId or Email
+            // Check if an account exists with this GoogleId or Email. Business Hub
+            // profiles (UserId set) also carry an email but are never accounts.
             var business = await _db.Businesses
+                .Where(b => b.UserId == null)
+                .OrderByDescending(b => b.GoogleId == payload.Subject)
                 .FirstOrDefaultAsync(b => b.GoogleId == payload.Subject || b.Email == payload.Email);
 
             if (business == null)
@@ -84,7 +131,8 @@ public class AuthController : ControllerBase
                 RefreshToken = refreshToken.Token,
                 BusinessId = business.Id, 
                 BusinessName = business.BusinessName, 
-                LogoUrl = business.LogoUrl 
+                LogoUrl = business.LogoUrl,
+                IsAdmin = business.IsAdmin
             });
         }
         catch (InvalidJwtException)
@@ -100,13 +148,17 @@ public class AuthController : ControllerBase
         
         var jwtId = Guid.NewGuid().ToString();
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, business.Id.ToString()),
             new Claim(ClaimTypes.Email, business.Email ?? ""),
             new Claim(ClaimTypes.Name, business.BusinessName),
             new Claim(JwtRegisteredClaimNames.Jti, jwtId)
         };
+        if (business.IsAdmin)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+        }
 
         var token = new JwtSecurityToken(
             issuer: _config["Jwt:Issuer"],
@@ -209,6 +261,17 @@ public class AuthController : ControllerBase
 public class GoogleLoginRequest
 {
     public string IdToken { get; set; } = string.Empty;
+}
+
+public class GoogleCodeLoginRequest
+{
+    public string Code { get; set; } = string.Empty;
+}
+
+public class GoogleTokenResponse
+{
+    [System.Text.Json.Serialization.JsonPropertyName("id_token")]
+    public string? IdToken { get; set; }
 }
 
 public class RefreshTokenRequest

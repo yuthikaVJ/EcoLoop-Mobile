@@ -7,6 +7,8 @@ import '../widgets/material_list_card.dart';
 import 'add_material_page.dart';
 import 'material_details_page.dart';
 import 'my_listings_page.dart';
+import '../../../ai_matching/presentation/matches_page.dart';
+import '../../../ai_matching/presentation/matches_providers.dart';
 
 class MaterialsMarketplacePage extends ConsumerStatefulWidget {
   const MaterialsMarketplacePage({super.key});
@@ -118,6 +120,19 @@ class _MaterialsMarketplacePageState
                   onTap: () => setState(() => _tabController.index = 1),
                 ),
                 const Spacer(),
+                // AI match suggestions
+                IconButton(
+                  tooltip: 'AI Matches',
+                  icon: Badge(
+                    isLabelVisible: ref.watch(pendingMatchCountProvider) > 0,
+                    label: Text('${ref.watch(pendingMatchCountProvider)}'),
+                    child: const Icon(Icons.auto_awesome, color: AppColors.forestGreen),
+                  ),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const MatchesPage()),
+                  ),
+                ),
                 // My Listings shortcut
                 IconButton(
                   icon: const Icon(

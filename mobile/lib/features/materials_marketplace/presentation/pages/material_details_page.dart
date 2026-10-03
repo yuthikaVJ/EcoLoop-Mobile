@@ -4,6 +4,8 @@ import '../../../../core/config/app_config.dart';
 import '../../domain/entities/material_listing.dart';
 import '../../../transactions_delivery/presentation/pages/confirm_material_transaction_page.dart';
 import 'chat_page.dart';
+import '../../../../shared/widgets/seller_name.dart';
+import '../../../../shared/widgets/image_carousel.dart';
 
 class MaterialDetailsPage extends StatelessWidget {
   final MaterialListing listing;
@@ -46,12 +48,15 @@ class MaterialDetailsPage extends StatelessWidget {
                     tag: heroTag,
                     child: Container(
                       color: AppColors.mintGreen,
-                      child: Image.network(
-                        listing.imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(Icons.image_outlined, size: 100, color: AppColors.ecoGreen);
-                        },
+                      child: ImageCarousel(
+                        itemCount: listing.photos.length,
+                        itemBuilder: (context, index) => Image.network(
+                          listing.photos[index],
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Icon(Icons.image_outlined, size: 100, color: AppColors.ecoGreen);
+                          },
+                        ),
                       ),
                     ),
                   ),
@@ -104,12 +109,12 @@ class MaterialDetailsPage extends StatelessWidget {
                       if (listing.isVerifiedSeller)
                         Row(
                           children: [
-                            const Icon(Icons.verified, color: AppColors.forestGreen, size: 16),
+                            const VerifiedBadge(size: 16),
                             const SizedBox(width: 4),
                             Text(
                               'Verified Seller',
                               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: AppColors.forestGreen,
+                                color: verifiedBlue,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -174,22 +179,10 @@ class MaterialDetailsPage extends StatelessWidget {
                   // Seller Info
                   const Text('Seller Information', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                   const SizedBox(height: 12),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: CircleAvatar(
-                      backgroundColor: AppColors.mintGreen,
-                      child: Text(
-                        (listing.companyName?.isNotEmpty == true) ? listing.companyName!.substring(0, 1) : 'U',
-                        style: const TextStyle(color: AppColors.forestGreen, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    title: Text(
-                      listing.companyName ?? 'Unknown Company',
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: const Text('Member since 2024 • 4.8 Rating'),
-                    trailing: const Icon(Icons.chevron_right),
+                  SellerTile(
+                    name: listing.companyName,
+                    verified: listing.isVerifiedSeller,
+                    logoUrl: listing.sellerLogoUrl,
                   ),
                   
                   const SizedBox(height: 80), // Bottom padding for FAB/BottomBar

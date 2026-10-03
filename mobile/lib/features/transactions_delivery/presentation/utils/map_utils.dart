@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:geocoding/geocoding.dart' as device;
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -81,16 +83,29 @@ LatLng? parseCoordinates(String? value) {
 String formatCoordinates(LatLng point) =>
     '${point.latitude.toStringAsFixed(6)}, ${point.longitude.toStringAsFixed(6)}';
 
+const _nativeLocation = MethodChannel('ecoloop/location');
+Future<LatLng>? _pendingPosition;
+
 /// Current position, asking for permission if needed.
 ///
 /// 1. Android's cached fix when it is younger than [maxAge] (instant, no GPS).
-/// 2. A real GPS fix (the emulator has no Wi-Fi/network location, so it needs
-///    GPS; set its position under Extended controls → Location).
-/// 3. If GPS doesn't answer in time, an older cached fix, so the button never
+/// 2. A real fix: on Android from Google Play Services via MainActivity
+///    (geolocator's own request can freeze the app on some Android builds; see
+///    MainActivity.getCurrentLocation), elsewhere from geolocator. The emulator
+///    has no Wi-Fi/network location, so it needs a position set under
+///    Extended controls → Location.
+/// 3. If no fix arrives in time, an older cached fix, so the button never
 ///    spins forever; the user can still tap the map to adjust the pin.
-Future<Position> currentPosition({
+///
+/// Overlapping calls (double taps, periodic sharing) share one lookup.
+Future<LatLng> currentPosition({
   Duration maxAge = const Duration(minutes: 2),
-}) async {
+}) {
+  return _pendingPosition ??=
+      _locate(maxAge).whenComplete(() => _pendingPosition = null);
+}
+
+Future<LatLng> _locate(Duration maxAge) async {
   if (!await Geolocator.isLocationServiceEnabled()) {
     throw Exception('Location services are disabled.');
   }
@@ -103,24 +118,48 @@ Future<Position> currentPosition({
     throw Exception('Location permission was not granted.');
   }
   final last = await Geolocator.getLastKnownPosition();
+  final lastPoint =
+      last == null ? null : LatLng(last.latitude, last.longitude);
   if (last != null && DateTime.now().difference(last.timestamp) <= maxAge) {
-    return last;
+    return lastPoint!;
   }
   try {
-    return await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        timeLimit: Duration(seconds: 15),
-      ),
-    );
+    final fresh = await _freshPosition(maxAge);
+    if (fresh != null) return fresh;
   } catch (_) {
-    // No GPS fix in time: an older position is better than an endless spinner.
-    if (last != null) return last;
-    throw Exception(
-      "Couldn't get your location. Turn on location, or on the emulator set one "
-      'under Extended controls (⋯) → Location → Set location.',
+    // Fall through to the cached position below.
+  }
+  // No fix in time: an older position is better than an endless spinner.
+  if (lastPoint != null) return lastPoint;
+  throw Exception(
+    "Couldn't get your location. Turn on location, or on the emulator set one "
+    'under Extended controls (⋯) → Location → Set location.',
+  );
+}
+
+Future<LatLng?> _freshPosition(Duration maxAge) async {
+  const timeLimit = Duration(seconds: 15);
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+    final result = await _nativeLocation
+        .invokeMapMethod<String, dynamic>('getCurrentLocation', {
+          'timeoutMs': timeLimit.inMilliseconds,
+          'maxAgeMs': maxAge.inMilliseconds,
+        })
+        // Play Services enforces the time limit too; this is a safety net.
+        .timeout(timeLimit + const Duration(seconds: 5));
+    if (result == null) return null;
+    return LatLng(
+      (result['latitude'] as num).toDouble(),
+      (result['longitude'] as num).toDouble(),
     );
   }
+  final position = await Geolocator.getCurrentPosition(
+    locationSettings: const LocationSettings(
+      accuracy: LocationAccuracy.high,
+      timeLimit: timeLimit,
+    ),
+  );
+  return LatLng(position.latitude, position.longitude);
 }
 
 /// Decodes a precision-5 encoded polyline (the route geometry the backend returns).

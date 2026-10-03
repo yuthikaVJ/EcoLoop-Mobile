@@ -27,6 +27,8 @@ public class EcoLoopDbContext : DbContext
     public DbSet<ProductOrderStatusHistory> ProductOrderStatusHistories => Set<ProductOrderStatusHistory>();
     public DbSet<Delivery> Deliveries => Set<Delivery>();
     public DbSet<DeliveryLocation> DeliveryLocations => Set<DeliveryLocation>();
+    public DbSet<MatchWorkflow> MatchWorkflows => Set<MatchWorkflow>();
+    public DbSet<MatchSuggestion> MatchSuggestions => Set<MatchSuggestion>();
 
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)
@@ -46,6 +48,12 @@ public class EcoLoopDbContext : DbContext
             .WithMany()
             .HasForeignKey(product => product.BusinessId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Product>()
+            .HasOne(product => product.PostedAsBusiness)
+            .WithMany()
+            .HasForeignKey(product => product.PostedAsBusinessId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         modelBuilder.Entity<Product>()
             .HasOne(product => product.Inventory)
@@ -76,6 +84,9 @@ public class EcoLoopDbContext : DbContext
         modelBuilder.Entity<Business>()
             .HasIndex(b => b.UserId);
 
+        modelBuilder.Entity<Business>()
+            .HasIndex(b => b.Status);
+
         // ── MaterialListing configuration ──
         modelBuilder.Entity<MaterialListing>()
             .Property(listing => listing.Price)
@@ -86,6 +97,12 @@ public class EcoLoopDbContext : DbContext
             .WithMany()
             .HasForeignKey(listing => listing.BusinessId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<MaterialListing>()
+            .HasOne(listing => listing.PostedAsBusiness)
+            .WithMany()
+            .HasForeignKey(listing => listing.PostedAsBusinessId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         modelBuilder.Entity<MaterialListing>()
             .HasIndex(listing => listing.Category);
@@ -132,6 +149,7 @@ public class EcoLoopDbContext : DbContext
             .HasIndex(d => d.BusinessId);
 
         ConfigureMaterialTransactions(modelBuilder);
+        ConfigureMatching(modelBuilder);
         ConfigureProductOrders(modelBuilder);
         ConfigureDeliveries(modelBuilder);
         modelBuilder.Entity<DeliveryLocation>(entity =>
@@ -174,6 +192,34 @@ public class EcoLoopDbContext : DbContext
             entity.HasOne(x => x.MaterialTransaction).WithMany(x => x.StatusHistory).HasForeignKey(x => x.MaterialTransactionId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(x => x.ChangedByBusiness).WithMany().HasForeignKey(x => x.ChangedByBusinessId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(x => new { x.MaterialTransactionId, x.CreatedAt });
+        });
+    }
+
+    private static void ConfigureMatching(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<MatchWorkflow>(entity =>
+        {
+            entity.Property(x => x.State).HasMaxLength(30);
+            entity.Property(x => x.Outcome).HasMaxLength(30);
+            entity.Property(x => x.Reason).HasMaxLength(500);
+            entity.Property(x => x.StateHistoryJson).HasColumnType("jsonb");
+            entity.Property(x => x.TraceJson).HasColumnType("jsonb");
+            entity.HasOne(x => x.Listing).WithMany().HasForeignKey(x => x.ListingId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.ListingId, x.CreatedAt });
+            entity.HasIndex(x => new { x.State, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<MatchSuggestion>(entity =>
+        {
+            entity.Property(x => x.Score).HasPrecision(4, 3);
+            entity.Property(x => x.QuantityCoverage).HasPrecision(4, 3);
+            entity.Property(x => x.HaveOwnerDecision).HasMaxLength(20);
+            entity.Property(x => x.NeedOwnerDecision).HasMaxLength(20);
+            entity.HasOne(x => x.Workflow).WithMany().HasForeignKey(x => x.WorkflowId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.HaveListing).WithMany().HasForeignKey(x => x.HaveListingId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.NeedListing).WithMany().HasForeignKey(x => x.NeedListingId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.HaveListingId, x.NeedListingId }).IsUnique();
+            entity.HasIndex(x => x.NeedListingId);
         });
     }
 

@@ -40,9 +40,12 @@ class MaterialListingsNotifier extends AsyncNotifier<List<MaterialListing>> {
     return _repository.getListings();
   }
 
-  Future<void> addListing(Map<String, dynamic> requestData, {File? imageFile}) async {
+  Future<void> addListing(
+    Map<String, dynamic> requestData, {
+    List<File> imageFiles = const [],
+  }) async {
     try {
-      final newListing = await _repository.createListing(requestData, imageFile: imageFile);
+      final newListing = await _repository.createListing(requestData, imageFiles: imageFiles);
       state = state.whenData((currentListings) {
         return [newListing, ...currentListings];
       });
@@ -52,9 +55,16 @@ class MaterialListingsNotifier extends AsyncNotifier<List<MaterialListing>> {
     }
   }
 
-  Future<void> updateListing(String id, Map<String, dynamic> requestData) async {
+  Future<void> updateListing(
+    String id,
+    Map<String, dynamic> requestData, {
+    List<File> newImages = const [],
+  }) async {
     try {
-      final updatedListing = await _repository.updateListing(id, requestData);
+      var updatedListing = await _repository.updateListing(id, requestData);
+      if (newImages.isNotEmpty) {
+        updatedListing = await _repository.addImages(id, newImages);
+      }
       state = state.whenData((currentListings) {
         return currentListings.map((l) => l.id == id ? updatedListing : l).toList();
       });

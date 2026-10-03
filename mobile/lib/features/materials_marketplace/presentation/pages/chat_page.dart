@@ -42,6 +42,9 @@ class ChatMessage {
 }
 
 class ChatPage extends ConsumerStatefulWidget {
+  /// Listing of the conversation on screen, so it isn't also shown as a notification.
+  static String? openListingId;
+
   final MaterialListing listing;
   // The other person in this conversation (the seller for a buyer, the buyer
   // for a seller replying from the inbox).
@@ -76,6 +79,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   @override
   void initState() {
     super.initState();
+    ChatPage.openListingId = widget.listing.id;
     _initChat();
   }
 
@@ -186,6 +190,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   @override
   void dispose() {
+    if (ChatPage.openListingId == widget.listing.id) ChatPage.openListingId = null;
     _hubConnection?.stop();
     _messageController.dispose();
     _scrollController.dispose();

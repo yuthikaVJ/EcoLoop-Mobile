@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'core/notifications/notification_router.dart';
 import 'core/theme/app_theme.dart';
 import 'shared/widgets/app_shell.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
@@ -58,6 +59,7 @@ class EcoLoopApp extends ConsumerWidget {
     });
 
     return MaterialApp(
+      navigatorKey: appNavigatorKey,
       title: 'EcoLoop',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,

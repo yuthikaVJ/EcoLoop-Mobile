@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/material_listing.dart';
 import '../../../sustainable_products/presentation/widgets/product_image_widget.dart';
+import '../../../../shared/widgets/seller_name.dart';
 
 /// Compact, full-width listing card used by the Materials marketplace list.
 /// Thumbnail on the left, details on the right; the same shape as
@@ -128,28 +129,13 @@ class MaterialListCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            listing.companyName ?? 'Unknown seller',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.slateGray,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                        if (listing.isVerifiedSeller) ...[
-                          const SizedBox(width: 4),
-                          const Icon(
-                            Icons.verified,
-                            color: AppColors.ecoGreen,
-                            size: 14,
-                          ),
-                        ],
-                      ],
+                    SellerName(
+                      name: listing.companyName,
+                      verified: listing.isVerifiedSeller,
+                      style: const TextStyle(
+                        color: AppColors.slateGray,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),

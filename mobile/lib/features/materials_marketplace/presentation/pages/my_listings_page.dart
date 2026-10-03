@@ -6,6 +6,8 @@ import '../providers/material_listings_provider.dart';
 import '../../../profile/presentation/providers/profile_provider.dart';
 import '../widgets/my_listing_card.dart';
 import 'edit_material_page.dart';
+import '../../../ai_matching/presentation/matches_page.dart';
+import '../../../ai_matching/presentation/matches_providers.dart';
 
 class MyListingsPage extends ConsumerStatefulWidget {
   const MyListingsPage({super.key});
@@ -97,11 +99,30 @@ class _MyListingsPageState extends ConsumerState<MyListingsPage> with SingleTick
     }
   }
 
+  Future<void> _findMatches(MaterialListing listing) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(matchesRepositoryProvider).findMatches(listing.id);
+      messenger.showSnackBar(SnackBar(
+        content: Text('EcoLoop AI is looking for matches for "${listing.title}". We\'ll notify you.'),
+      ));
+    } catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text('Could not start matching: $error')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Listings', style: TextStyle(fontWeight: FontWeight.bold)),
+        actions: [
+          IconButton(
+            tooltip: 'AI Matches',
+            icon: const Icon(Icons.auto_awesome, color: AppColors.forestGreen),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MatchesPage())),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: AppColors.forestGreen,
@@ -140,6 +161,7 @@ class _MyListingsPageState extends ConsumerState<MyListingsPage> with SingleTick
                       return MyListingCard(
                         listing: myActive[index],
                         isActive: true,
+                        onFindMatches: () => _findMatches(myActive[index]),
                         onEdit: () async {
                           final result = await Navigator.push(
                             context,

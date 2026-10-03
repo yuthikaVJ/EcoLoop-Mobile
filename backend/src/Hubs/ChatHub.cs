@@ -80,7 +80,8 @@ public class ChatHub : Hub
                 new Dictionary<string, string>
                 {
                     { "type", "chat_message" },
-                    { "listingId", listingId.ToString() }
+                    { "listingId", listingId.ToString() },
+                    { "senderId", senderId.ToString() }
                 }
             );
         }

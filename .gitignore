@@ -65,3 +65,11 @@ Desktop.ini
 # React / Node (admin web)
 admin_web/node_modules/
 admin_web/dist/
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# Python virtual environments and caches
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/

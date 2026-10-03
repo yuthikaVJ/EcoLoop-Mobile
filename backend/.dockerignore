@@ -1,0 +1,7 @@
+bin/
+obj/
+.vs/
+.env
+firebase-key.json
+*.user
+*.suo

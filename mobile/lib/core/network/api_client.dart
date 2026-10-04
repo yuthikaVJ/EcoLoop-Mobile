@@ -1,13 +1,14 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../features/auth/data/repositories/auth_repository.dart';
+import '../config/app_config.dart';
 
 class ApiClient {
   final AuthRepository _authRepository;
   final String baseUrl;
 
   ApiClient(this._authRepository, {String? baseUrl}) 
-      : baseUrl = baseUrl ?? 'http://10.0.2.2:5252';
+      : baseUrl = baseUrl ?? AppConfig.serverUrl;
 
   Future<Map<String, String>> getAuthHeaders() async {
     final token = await _authRepository.getSavedToken();
@@ -153,12 +154,7 @@ class ApiClient {
 
   /// Turns a server-relative path such as `/uploads/...` into a full URL.
   String? resolveUrl(String? pathOrUrl) {
-    if (pathOrUrl == null || pathOrUrl.trim().isEmpty) return null;
-    final trimmed = pathOrUrl.trim();
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-      return trimmed;
-    }
-    return trimmed.startsWith('/') ? '$baseUrl$trimmed' : '$baseUrl/$trimmed';
+    return AppConfig.mediaUrl(pathOrUrl);
   }
 }
 

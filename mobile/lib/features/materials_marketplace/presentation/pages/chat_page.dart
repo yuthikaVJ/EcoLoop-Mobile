@@ -123,7 +123,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     _hubConnection = HubConnectionBuilder()
         .withUrl(
-          "http://10.0.2.2:5252/chatHub",
+          AppConfig.chatHubUrl,
           options: HttpConnectionOptions(
             accessTokenFactory: () async =>
                 await authRepository.getSavedToken() ?? '',

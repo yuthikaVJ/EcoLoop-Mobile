@@ -7,7 +7,7 @@ import '../../../../core/config/app_config.dart';
 
 class AuthRepository {
   final _storage = const FlutterSecureStorage();
-  final String _baseUrl = 'http://10.0.2.2:5252/api/auth';
+  final String _baseUrl = '${AppConfig.apiBaseUrl}/auth';
 
   bool _initialized = false;
   // Static: several AuthRepository instances exist (Riverpod's and the

@@ -107,9 +107,6 @@ class SellerTile extends StatelessWidget {
   /// Business logos are stored as server paths (/uploads/...); Google profile
   /// photos are full URLs.
   static String? _resolve(String? url) {
-    if (url == null || url.trim().isEmpty) return null;
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
-    final server = AppConfig.apiBaseUrl.replaceFirst(RegExp(r'/api/?$'), '');
-    return url.startsWith('/') ? '$server$url' : '$server/$url';
+    return AppConfig.mediaUrl(url);
   }
 }

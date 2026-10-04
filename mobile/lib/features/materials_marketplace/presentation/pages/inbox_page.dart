@@ -6,6 +6,7 @@ import '../../../../core/network/api_client_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/material_listing.dart';
 import 'chat_page.dart';
+import '../../../../core/config/app_config.dart';
 
 /// One conversation: a listing + the other business (from GET /api/chat/inbox).
 class _Conversation {
@@ -32,7 +33,7 @@ class _Conversation {
         isIHave: (json['listingType'] as num?)?.toInt() != 1,
         status: (json['listingStatus'] as num?)?.toInt() ?? 0,
         datePosted: DateTime.now(),
-        imageUrl: json['listingImageUrl'] as String? ?? '',
+        imageUrl: AppConfig.mediaUrl(json['listingImageUrl'] as String?) ?? '',
       ),
       otherId = json['otherBusinessId'].toString(),
       otherName = json['otherBusinessName'] as String? ?? 'Unknown',

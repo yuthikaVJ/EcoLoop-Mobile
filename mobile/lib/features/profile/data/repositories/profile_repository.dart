@@ -1,10 +1,11 @@
 import 'dart:convert';
 import '../../../../core/network/api_client.dart';
 import '../../domain/entities/account_profile.dart';
+import '../../../../core/config/app_config.dart';
 
 class ProfileRepository {
   final ApiClient _apiClient;
-  final String _baseUrl = 'http://10.0.2.2:5252/api/business';
+  final String _baseUrl = '${AppConfig.apiBaseUrl}/business';
 
   ProfileRepository(this._apiClient);
 

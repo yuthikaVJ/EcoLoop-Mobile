@@ -1,3 +1,5 @@
+import '../../../core/config/app_config.dart';
+
 /// One side of an AI match: a marketplace post.
 class MatchListing {
   final String id;
@@ -37,7 +39,7 @@ class MatchListing {
         quantity: json['quantity'] as String? ?? '',
         unit: json['unit'] as String? ?? '',
         location: json['location'] as String? ?? '',
-        imageUrl: json['imageUrl'] as String?,
+        imageUrl: AppConfig.mediaUrl(json['imageUrl'] as String?),
         seller: json['seller'] as String?,
         sellerIsVerified: json['sellerIsVerified'] as bool? ?? false,
         ownerBusinessId: json['ownerBusinessId'].toString(),

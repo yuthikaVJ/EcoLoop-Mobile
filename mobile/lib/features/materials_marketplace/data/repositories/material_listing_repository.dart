@@ -3,9 +3,10 @@ import 'package:http/http.dart' as http;
 import 'dart:io';
 import '../../../../core/network/api_client.dart';
 import '../../domain/entities/material_listing.dart';
+import '../../../../core/config/app_config.dart';
 
 class MaterialListingRepository {
-  static const String baseUrl = 'http://10.0.2.2:5252/api/MaterialListings';
+  static const String baseUrl = '${AppConfig.apiBaseUrl}/MaterialListings';
   final ApiClient _apiClient;
 
   MaterialListingRepository(this._apiClient);

@@ -2,10 +2,35 @@ import 'dart:convert';
 
 /// Shared connection settings and the signed-in business for all features.
 class AppConfig {
-  static const apiBaseUrl = String.fromEnvironment(
-    'ECOLOOP_API_URL',
-    defaultValue: 'http://10.0.2.2:5252/api',
+  /// The ONE place to change the backend address. Override at build time with
+  /// --dart-define=ECOLOOP_SERVER_URL=https://your-host (no trailing slash).
+  /// Default is the hosted backend; for a local backend on the Android emulator
+  /// use http://10.0.2.2:5252.
+  static const serverUrl = String.fromEnvironment(
+    'ECOLOOP_SERVER_URL',
+    defaultValue: 'http://52.74.2.76:5252',
   );
+
+  static const apiBaseUrl = '$serverUrl/api';
+  static const chatHubUrl = '$serverUrl/chatHub';
+
+  // Hosts older uploads were saved with; rewritten to [serverUrl] for display.
+  static final _legacyHost =
+      RegExp(r'^https?://(10\.0\.2\.2|localhost|127\.0\.0\.1)(:\d+)?');
+
+  /// Full URL for an uploaded file: resolves server paths (/uploads/...) and
+  /// rewrites links saved with the emulator's local address.
+  static String? mediaUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return null;
+    final trimmed = url.trim();
+    if (_legacyHost.hasMatch(trimmed)) {
+      return trimmed.replaceFirst(_legacyHost, serverUrl);
+    }
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    return trimmed.startsWith('/') ? '$serverUrl$trimmed' : '$serverUrl/$trimmed';
+  }
 
   static const _nameIdentifierClaim =
       'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier';

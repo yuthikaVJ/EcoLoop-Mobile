@@ -1,0 +1,373 @@
+using EcoLoop.Api.Data;
+using EcoLoop.Api.DTOs;
+using EcoLoop.Api.Models;
+using EcoLoop.Api.Services.Interfaces;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
+
+namespace EcoLoop.Api.Services;
+
+public class BusinessProfileService : IBusinessProfileService
+{
+    private readonly EcoLoopDbContext _db;
+    private readonly IWebHostEnvironment? _environment;
+    private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".jpg", ".jpeg", ".png"
+    };
+    private const long MaxFileSizeBytes = 5 * 1024 * 1024; // 5 MB
+
+    public BusinessProfileService(EcoLoopDbContext db, IWebHostEnvironment? environment = null)
+    {
+        _db = db;
+        _environment = environment;
+    }
+
+    // Like Facebook Pages, one signed-in account may own several business profiles.
+    public async Task<BusinessProfileDto> CreateAsync(
+        CreateBusinessProfileRequest request,
+        Guid userId)
+    {
+        var normalizedRegNum = request.RegistrationNumber.Trim();
+        var exists = await _db.Businesses
+            .AnyAsync(b => b.RegistrationNumber != null &&
+                           b.RegistrationNumber.ToLower() == normalizedRegNum.ToLower());
+
+        if (exists)
+        {
+            throw new InvalidOperationException($"A business with registration number '{normalizedRegNum}' already exists.");
+        }
+
+        var business = new Business
+        {
+            Id = Guid.NewGuid(),
+            BusinessName = request.BusinessName.Trim(),
+            IndustryType = request.BusinessType.Trim(),
+            RegistrationNumber = normalizedRegNum,
+            Bio = string.IsNullOrWhiteSpace(request.Bio) ? null : request.Bio.Trim(),
+            Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
+            Email = request.Email.Trim().ToLowerInvariant(),
+            PhoneNumber = request.Phone.Trim(),
+            Address = request.Address.Trim(),
+            WebsiteUrl = string.IsNullOrWhiteSpace(request.WebsiteUrl) ? null : request.WebsiteUrl.Trim(),
+            LogoUrl = string.IsNullOrWhiteSpace(request.LogoUrl) ? null : request.LogoUrl.Trim(),
+            CoverPhotoUrl = string.IsNullOrWhiteSpace(request.CoverPhotoUrl) ? null : request.CoverPhotoUrl.Trim(),
+            IsVerified = false,
+            Status = BusinessVerificationStatus.Unverified,
+            UserId = userId,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _db.Businesses.Add(business);
+        await _db.SaveChangesAsync();
+
+        return MapToDto(business);
+    }
+
+    public async Task<BusinessProfileDto?> GetByIdAsync(Guid id)
+    {
+        var business = await HubProfiles()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(b => b.Id == id);
+
+        return business == null ? null : MapToDto(business);
+    }
+
+    public async Task<BusinessProfileDto?> GetByUserIdAsync(Guid userId)
+    {
+        var business = await HubProfiles()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(b => b.UserId == userId);
+
+        return business == null ? null : MapToDto(business);
+    }
+
+    public async Task<List<BusinessProfileDto>> GetMyProfilesAsync(Guid userId)
+    {
+        return await HubProfiles()
+            .AsNoTracking()
+            .Where(b => b.UserId == userId)
+            .OrderByDescending(b => b.CreatedAt)
+            .Select(b => MapToDto(b))
+            .ToListAsync();
+    }
+
+    public async Task<List<BusinessProfileDto>> GetAllAsync()
+    {
+        return await HubProfiles()
+            .AsNoTracking()
+            .OrderByDescending(b => b.CreatedAt)
+            .Select(b => MapToDto(b))
+            .ToListAsync();
+    }
+
+    public async Task<BusinessProfileDto> UpdateAsync(
+        Guid id,
+        UpdateBusinessProfileRequest request,
+        Guid userId)
+    {
+        var business = await FindOwnedAsync(id, userId);
+
+        business.BusinessName = request.BusinessName.Trim();
+        business.IndustryType = request.BusinessType.Trim();
+        business.Bio = string.IsNullOrWhiteSpace(request.Bio) ? null : request.Bio.Trim();
+        business.Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
+        business.Email = request.Email.Trim().ToLowerInvariant();
+        business.PhoneNumber = request.Phone.Trim();
+        business.Address = request.Address.Trim();
+        business.WebsiteUrl = string.IsNullOrWhiteSpace(request.WebsiteUrl) ? null : request.WebsiteUrl.Trim();
+        
+        if (request.LogoUrl != null)
+        {
+            business.LogoUrl = string.IsNullOrWhiteSpace(request.LogoUrl) ? null : request.LogoUrl.Trim();
+        }
+
+        if (request.CoverPhotoUrl != null)
+        {
+            business.CoverPhotoUrl = string.IsNullOrWhiteSpace(request.CoverPhotoUrl) ? null : request.CoverPhotoUrl.Trim();
+        }
+
+        // Editing a rejected business resubmits it for admin review.
+        if (business.Status == BusinessVerificationStatus.Rejected)
+        {
+            business.Status = BusinessVerificationStatus.Unverified;
+            business.VerificationNote = null;
+        }
+
+        business.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync();
+        return MapToDto(business);
+    }
+
+    public async Task EnsureCanPostAsAsync(Guid userId, Guid businessProfileId)
+    {
+        var business = await HubProfiles()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(b => b.Id == businessProfileId);
+
+        if (business == null || business.UserId != userId)
+        {
+            throw new UnauthorizedAccessException("You can only post as a business you own.");
+        }
+
+        if (!business.IsVerified)
+        {
+            throw new InvalidOperationException(
+                $"\"{business.BusinessName}\" is not verified yet. An admin must approve it before you can post as this business.");
+        }
+    }
+
+    public async Task<BusinessProfileDto> UploadImageAsync(
+        Guid id,
+        Stream fileStream,
+        string fileName,
+        string contentType,
+        string imageType,
+        Guid userId)
+    {
+        var business = await FindOwnedAsync(id, userId);
+
+        var normalizedType = imageType.Trim().ToLowerInvariant();
+        if (normalizedType != "profile" && normalizedType != "logo" && normalizedType != "cover")
+        {
+            throw new ArgumentException("Image type must be either 'profile' or 'cover'.");
+        }
+
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(ext) || !AllowedExtensions.Contains(ext))
+        {
+            throw new ArgumentException($"Invalid file type '{ext}'. Allowed extensions are: {string.Join(", ", AllowedExtensions)}");
+        }
+
+        if (fileStream.Length >= MaxFileSizeBytes)
+        {
+            throw new ArgumentException("File size must be less than 5 MB.");
+        }
+
+        var rootPath = _environment?.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+        var uploadDir = Path.Combine(rootPath, "uploads", "business_profiles", id.ToString());
+        Directory.CreateDirectory(uploadDir);
+
+        var safeFileName = $"{normalizedType}_{Guid.NewGuid():N}{ext}";
+        var physicalPath = Path.Combine(uploadDir, safeFileName);
+
+        // Remove old file if it was a local upload
+        var oldUrl = (normalizedType == "cover") ? business.CoverPhotoUrl : business.LogoUrl;
+        DeleteLocalFileIfPresent(rootPath, oldUrl);
+
+        using (var destStream = new FileStream(physicalPath, FileMode.Create))
+        {
+            if (fileStream.CanSeek)
+            {
+                fileStream.Position = 0;
+            }
+            await fileStream.CopyToAsync(destStream);
+        }
+
+        var relativeUrl = $"/uploads/business_profiles/{id}/{safeFileName}";
+
+        if (normalizedType == "cover")
+        {
+            business.CoverPhotoUrl = relativeUrl;
+        }
+        else
+        {
+            business.LogoUrl = relativeUrl;
+        }
+
+        business.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        return MapToDto(business);
+    }
+
+    public async Task<BusinessProfileDto> DeleteImageAsync(
+        Guid id,
+        string imageType,
+        Guid userId)
+    {
+        var business = await FindOwnedAsync(id, userId);
+
+        var normalizedType = imageType.Trim().ToLowerInvariant();
+        var rootPath = _environment?.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+
+        if (normalizedType == "cover")
+        {
+            DeleteLocalFileIfPresent(rootPath, business.CoverPhotoUrl);
+            business.CoverPhotoUrl = null;
+        }
+        else if (normalizedType == "profile" || normalizedType == "logo")
+        {
+            DeleteLocalFileIfPresent(rootPath, business.LogoUrl);
+            business.LogoUrl = null;
+        }
+        else
+        {
+            throw new ArgumentException("Image type must be either 'profile' or 'cover'.");
+        }
+
+        business.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        return MapToDto(business);
+    }
+
+    public async Task DeleteAsync(Guid id, Guid userId)
+    {
+        var business = await FindOwnedAsync(id, userId);
+
+        var rootPath = _environment?.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+        DeleteLocalFileIfPresent(rootPath, business.LogoUrl);
+        DeleteLocalFileIfPresent(rootPath, business.CoverPhotoUrl);
+
+        _db.Businesses.Remove(business);
+        await _db.SaveChangesAsync();
+    }
+
+    // Active listings and products posted as this business, newest first.
+    public async Task<List<BusinessPostDto>> GetPostsByBusinessIdAsync(Guid businessId)
+    {
+        var listings = await _db.MaterialListings
+            .AsNoTracking()
+            .Where(l => l.PostedAsBusinessId == businessId && l.Status == ListingStatus.Active)
+            .Select(l => new BusinessPostDto
+            {
+                Id = l.Id,
+                BusinessProfileId = businessId,
+                Title = l.Title,
+                Content = l.Description,
+                Type = l.Type == ListingType.INeed ? "I NEED" : "I HAVE",
+                MaterialCategory = l.Category,
+                Quantity = (l.Quantity + " " + l.Unit).Trim(),
+                CreatedAt = l.CreatedAt
+            })
+            .ToListAsync();
+
+        var products = await _db.Products
+            .AsNoTracking()
+            .Where(p => p.PostedAsBusinessId == businessId && p.IsActive)
+            .Select(p => new BusinessPostDto
+            {
+                Id = p.Id,
+                BusinessProfileId = businessId,
+                Title = p.Name,
+                Content = p.Description,
+                Type = "PRODUCT",
+                MaterialCategory = p.Category != null ? p.Category.Name : p.MaterialType,
+                Quantity = "LKR " + p.Price.ToString("0.00"),
+                CreatedAt = p.CreatedAt
+            })
+            .ToListAsync();
+
+        return listings.Concat(products)
+            .OrderByDescending(post => post.CreatedAt)
+            .ToList();
+    }
+
+    // Account rows (UserId == null) are not Business Hub profiles and must never
+    // be reachable through this service.
+    private IQueryable<Business> HubProfiles() => _db.Businesses.Where(b => b.UserId != null);
+
+    private async Task<Business> FindOwnedAsync(Guid id, Guid userId)
+    {
+        var business = await HubProfiles().FirstOrDefaultAsync(b => b.Id == id);
+        if (business == null)
+        {
+            throw new KeyNotFoundException($"Business profile with ID '{id}' was not found.");
+        }
+
+        if (business.UserId != userId)
+        {
+            throw new UnauthorizedAccessException("You are not authorized to modify this business profile.");
+        }
+
+        return business;
+    }
+
+    private static void DeleteLocalFileIfPresent(string rootPath, string? relativeUrl)
+    {
+        if (string.IsNullOrWhiteSpace(relativeUrl)) return;
+        if (!relativeUrl.StartsWith("/uploads/")) return;
+
+        var relativeSanitized = relativeUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        var physicalPath = Path.Combine(rootPath, relativeSanitized);
+        if (File.Exists(physicalPath))
+        {
+            try
+            {
+                File.Delete(physicalPath);
+            }
+            catch
+            {
+                // Silently ignore cleanup errors to avoid blocking DB update
+            }
+        }
+    }
+
+    private static BusinessProfileDto MapToDto(Business b)
+    {
+        return new BusinessProfileDto
+        {
+            Id = b.Id,
+            BusinessName = b.BusinessName,
+            BusinessType = b.IndustryType ?? string.Empty,
+            RegistrationNumber = b.RegistrationNumber ?? string.Empty,
+            Bio = b.Bio,
+            Description = b.Description,
+            Email = b.Email ?? string.Empty,
+            Phone = b.PhoneNumber ?? string.Empty,
+            Address = b.Address ?? string.Empty,
+            WebsiteUrl = b.WebsiteUrl,
+            LogoUrl = b.LogoUrl,
+            CoverPhotoUrl = b.CoverPhotoUrl,
+            IsVerified = b.IsVerified,
+            Status = b.Status,
+            VerificationNote = b.VerificationNote,
+            VerifiedAt = b.VerifiedAt,
+            UserId = b.UserId,
+            CreatedAt = b.CreatedAt,
+            UpdatedAt = b.UpdatedAt
+        };
+    }
+}

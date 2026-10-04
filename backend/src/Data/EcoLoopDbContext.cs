@@ -1,0 +1,281 @@
+using EcoLoop.Api.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace EcoLoop.Api.Data;
+
+public class EcoLoopDbContext : DbContext
+{
+    public EcoLoopDbContext(
+        DbContextOptions<EcoLoopDbContext> options)
+        : base(options)
+    {
+    }
+
+    public DbSet<Product> Products => Set<Product>();
+    public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
+    public DbSet<ProductImage> ProductImages => Set<ProductImage>();
+    public DbSet<Inventory> Inventories => Set<Inventory>();
+    public DbSet<Business> Businesses => Set<Business>();
+    public DbSet<MaterialListing> MaterialListings => Set<MaterialListing>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+    public DbSet<DeviceToken> DeviceTokens => Set<DeviceToken>();
+    public DbSet<MaterialTransaction> MaterialTransactions => Set<MaterialTransaction>();
+    public DbSet<MaterialTransactionStatusHistory> MaterialTransactionStatusHistories => Set<MaterialTransactionStatusHistory>();
+    public DbSet<ProductOrder> ProductOrders => Set<ProductOrder>();
+    public DbSet<ProductOrderItem> ProductOrderItems => Set<ProductOrderItem>();
+    public DbSet<ProductOrderStatusHistory> ProductOrderStatusHistories => Set<ProductOrderStatusHistory>();
+    public DbSet<Delivery> Deliveries => Set<Delivery>();
+    public DbSet<DeliveryLocation> DeliveryLocations => Set<DeliveryLocation>();
+    public DbSet<MatchWorkflow> MatchWorkflows => Set<MatchWorkflow>();
+    public DbSet<MatchSuggestion> MatchSuggestions => Set<MatchSuggestion>();
+
+    protected override void OnModelCreating(
+        ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Product>()
+            .Property(product => product.Price)
+            .HasPrecision(12, 2);
+
+        modelBuilder.Entity<Product>()
+            .HasOne(product => product.Category)
+            .WithMany(category => category.Products)
+            .HasForeignKey(product => product.CategoryId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Product>()
+            .HasOne(product => product.Business)
+            .WithMany()
+            .HasForeignKey(product => product.BusinessId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Product>()
+            .HasOne(product => product.PostedAsBusiness)
+            .WithMany()
+            .HasForeignKey(product => product.PostedAsBusinessId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<Product>()
+            .HasOne(product => product.Inventory)
+            .WithOne(inventory => inventory.Product)
+            .HasForeignKey<Inventory>(
+                inventory => inventory.ProductId);
+
+        modelBuilder.Entity<Product>()
+            .HasMany(product => product.Images)
+            .WithOne(image => image.Product)
+            .HasForeignKey(image => image.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Product>()
+            .HasIndex(product => product.Name);
+
+        modelBuilder.Entity<Product>()
+            .HasIndex(product => product.CategoryId);
+
+        modelBuilder.Entity<Inventory>()
+            .HasIndex(inventory => inventory.ProductId)
+            .IsUnique();
+
+        // ── Business Hub profile configuration ──
+        modelBuilder.Entity<Business>()
+            .HasIndex(b => b.RegistrationNumber);
+
+        modelBuilder.Entity<Business>()
+            .HasIndex(b => b.UserId);
+
+        modelBuilder.Entity<Business>()
+            .HasIndex(b => b.Status);
+
+        // ── MaterialListing configuration ──
+        modelBuilder.Entity<MaterialListing>()
+            .Property(listing => listing.Price)
+            .HasPrecision(12, 2);
+
+        modelBuilder.Entity<MaterialListing>()
+            .HasOne(listing => listing.Business)
+            .WithMany()
+            .HasForeignKey(listing => listing.BusinessId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<MaterialListing>()
+            .HasOne(listing => listing.PostedAsBusiness)
+            .WithMany()
+            .HasForeignKey(listing => listing.PostedAsBusinessId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<MaterialListing>()
+            .HasIndex(listing => listing.Category);
+
+        modelBuilder.Entity<MaterialListing>()
+            .HasIndex(listing => listing.Type);
+
+        modelBuilder.Entity<MaterialListing>()
+            .HasIndex(listing => listing.Status);
+
+        modelBuilder.Entity<MaterialListing>()
+            .HasIndex(listing => listing.BusinessId);
+
+        // ── ChatMessage configuration ──
+        modelBuilder.Entity<ChatMessage>()
+            .HasOne(m => m.Listing)
+            .WithMany()
+            .HasForeignKey(m => m.ListingId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ChatMessage>()
+            .HasOne(m => m.Sender)
+            .WithMany()
+            .HasForeignKey(m => m.SenderId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ChatMessage>()
+            .HasOne(m => m.Receiver)
+            .WithMany()
+            .HasForeignKey(m => m.ReceiverId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ChatMessage>()
+            .HasIndex(m => m.ListingId);
+
+        // ── DeviceToken configuration ──
+        modelBuilder.Entity<DeviceToken>()
+            .HasOne(d => d.Business)
+            .WithMany()
+            .HasForeignKey(d => d.BusinessId)
+            .OnDelete(DeleteBehavior.Cascade);
+            
+        modelBuilder.Entity<DeviceToken>()
+            .HasIndex(d => d.BusinessId);
+
+        ConfigureMaterialTransactions(modelBuilder);
+        ConfigureMatching(modelBuilder);
+        ConfigureProductOrders(modelBuilder);
+        ConfigureDeliveries(modelBuilder);
+        modelBuilder.Entity<DeliveryLocation>(entity =>
+        {
+            entity.Property(x => x.Label).HasMaxLength(80);
+            entity.Property(x => x.Address).HasMaxLength(500);
+            entity.HasOne(x => x.Business).WithMany().HasForeignKey(x => x.BusinessId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.BusinessId, x.Label });
+            entity.ToTable(t => t.HasCheckConstraint("CK_DeliveryLocations_Coordinates",
+                "(\"Latitude\" IS NULL AND \"Longitude\" IS NULL) OR (\"Latitude\" IS NOT NULL AND \"Longitude\" IS NOT NULL AND \"Latitude\" BETWEEN -90 AND 90 AND \"Longitude\" BETWEEN -180 AND 180)"));
+        });
+    }
+
+    private static void ConfigureMaterialTransactions(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<MaterialTransaction>(entity =>
+        {
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint("CK_MaterialTransactions_Quantity", "\"Quantity\" > 0");
+                table.HasCheckConstraint("CK_MaterialTransactions_Amounts", "\"UnitPrice\" >= 0 AND \"TotalAmount\" >= 0");
+                table.HasCheckConstraint("CK_MaterialTransactions_DifferentParties", "\"BuyerBusinessId\" <> \"SellerBusinessId\"");
+            });
+            entity.Property(x => x.Quantity).HasPrecision(12, 3);
+            entity.Property(x => x.UnitPrice).HasPrecision(12, 2);
+            entity.Property(x => x.TotalAmount).HasPrecision(12, 2);
+            entity.Property(x => x.Unit).HasMaxLength(50);
+            entity.HasOne(x => x.MaterialListing).WithMany(x => x.Transactions).HasForeignKey(x => x.MaterialListingId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.BuyerBusiness).WithMany().HasForeignKey(x => x.BuyerBusinessId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.SellerBusiness).WithMany().HasForeignKey(x => x.SellerBusinessId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.MaterialListingId);
+            entity.HasIndex(x => x.Status);
+            entity.HasIndex(x => new { x.BuyerBusinessId, x.CreatedAt });
+            entity.HasIndex(x => new { x.SellerBusinessId, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<MaterialTransactionStatusHistory>(entity =>
+        {
+            entity.Property(x => x.Note).HasMaxLength(500);
+            entity.HasOne(x => x.MaterialTransaction).WithMany(x => x.StatusHistory).HasForeignKey(x => x.MaterialTransactionId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.ChangedByBusiness).WithMany().HasForeignKey(x => x.ChangedByBusinessId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.MaterialTransactionId, x.CreatedAt });
+        });
+    }
+
+    private static void ConfigureMatching(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<MatchWorkflow>(entity =>
+        {
+            entity.Property(x => x.State).HasMaxLength(30);
+            entity.Property(x => x.Outcome).HasMaxLength(30);
+            entity.Property(x => x.Reason).HasMaxLength(500);
+            entity.Property(x => x.StateHistoryJson).HasColumnType("jsonb");
+            entity.Property(x => x.TraceJson).HasColumnType("jsonb");
+            entity.HasOne(x => x.Listing).WithMany().HasForeignKey(x => x.ListingId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.ListingId, x.CreatedAt });
+            entity.HasIndex(x => new { x.State, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<MatchSuggestion>(entity =>
+        {
+            entity.Property(x => x.Score).HasPrecision(4, 3);
+            entity.Property(x => x.QuantityCoverage).HasPrecision(4, 3);
+            entity.Property(x => x.HaveOwnerDecision).HasMaxLength(20);
+            entity.Property(x => x.NeedOwnerDecision).HasMaxLength(20);
+            entity.HasOne(x => x.Workflow).WithMany().HasForeignKey(x => x.WorkflowId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.HaveListing).WithMany().HasForeignKey(x => x.HaveListingId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.NeedListing).WithMany().HasForeignKey(x => x.NeedListingId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.HaveListingId, x.NeedListingId }).IsUnique();
+            entity.HasIndex(x => x.NeedListingId);
+        });
+    }
+
+    private static void ConfigureProductOrders(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ProductOrder>(entity =>
+        {
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint("CK_ProductOrders_TotalAmount", "\"TotalAmount\" >= 0");
+                table.HasCheckConstraint("CK_ProductOrders_DifferentParties", "\"BuyerBusinessId\" <> \"SellerBusinessId\"");
+            });
+            entity.Property(x => x.TotalAmount).HasPrecision(12, 2);
+            entity.HasOne(x => x.BuyerBusiness).WithMany().HasForeignKey(x => x.BuyerBusinessId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.SellerBusiness).WithMany().HasForeignKey(x => x.SellerBusinessId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.Status);
+            entity.HasIndex(x => new { x.BuyerBusinessId, x.CreatedAt });
+            entity.HasIndex(x => new { x.SellerBusinessId, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<ProductOrderItem>(entity =>
+        {
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint("CK_ProductOrderItems_Quantity", "\"Quantity\" > 0");
+                table.HasCheckConstraint("CK_ProductOrderItems_Amounts", "\"UnitPrice\" >= 0 AND \"LineTotal\" >= 0");
+            });
+            entity.Property(x => x.ProductName).HasMaxLength(200);
+            entity.Property(x => x.UnitPrice).HasPrecision(12, 2);
+            entity.Property(x => x.LineTotal).HasPrecision(12, 2);
+            entity.HasOne(x => x.ProductOrder).WithMany(x => x.Items).HasForeignKey(x => x.ProductOrderId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Product).WithMany(x => x.OrderItems).HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.ProductOrderId, x.ProductId }).IsUnique();
+        });
+
+        modelBuilder.Entity<ProductOrderStatusHistory>(entity =>
+        {
+            entity.Property(x => x.Note).HasMaxLength(500);
+            entity.HasOne(x => x.ProductOrder).WithMany(x => x.StatusHistory).HasForeignKey(x => x.ProductOrderId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.ChangedByBusiness).WithMany().HasForeignKey(x => x.ChangedByBusinessId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.ProductOrderId, x.CreatedAt });
+        });
+    }
+
+    private static void ConfigureDeliveries(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Delivery>(entity =>
+        {
+            entity.ToTable(table => table.HasCheckConstraint(
+                "CK_Deliveries_ExactlyOneParent",
+                "(\"MaterialTransactionId\" IS NOT NULL AND \"ProductOrderId\" IS NULL) OR (\"MaterialTransactionId\" IS NULL AND \"ProductOrderId\" IS NOT NULL)"));
+            entity.Property(x => x.Location).HasMaxLength(500);
+            entity.HasOne(x => x.MaterialTransaction).WithOne(x => x.Delivery).HasForeignKey<Delivery>(x => x.MaterialTransactionId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.ProductOrder).WithOne(x => x.Delivery).HasForeignKey<Delivery>(x => x.ProductOrderId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.MaterialTransactionId).IsUnique();
+            entity.HasIndex(x => x.ProductOrderId).IsUnique();
+        });
+    }
+}

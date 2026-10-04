@@ -1,0 +1,36 @@
+import 'dart:convert';
+import '../../../../core/network/api_client.dart';
+import '../../domain/entities/account_profile.dart';
+import '../../../../core/config/app_config.dart';
+
+class ProfileRepository {
+  final ApiClient _apiClient;
+  final String _baseUrl = '${AppConfig.apiBaseUrl}/business';
+
+  ProfileRepository(this._apiClient);
+
+  Future<AccountProfile> getProfile() async {
+    final response = await _apiClient.get('$_baseUrl/me');
+
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> data = json.decode(response.body);
+      return AccountProfile.fromJson(data);
+    } else {
+      throw Exception('Failed to load profile');
+    }
+  }
+
+  Future<AccountProfile> updateProfile(AccountProfile profile) async {
+    final response = await _apiClient.put(
+      '$_baseUrl/me',
+      body: json.encode(profile.toJson()),
+    );
+
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> data = json.decode(response.body);
+      return AccountProfile.fromJson(data);
+    } else {
+      throw Exception('Failed to update profile');
+    }
+  }
+}

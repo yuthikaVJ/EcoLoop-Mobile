@@ -1,0 +1,24 @@
+using EcoLoop.Api.DTOs;
+
+namespace EcoLoop.Api.Services.Interfaces;
+
+public interface IMaterialListingService
+{
+    Task<object> GetAllAsync(
+        string? search,
+        string? category,
+        int? type,
+        int page,
+        int pageSize,
+        Guid? businessId = null,
+        int status = 0);
+
+    Task<List<MaterialListingListDto>> GetByBusinessAsync(Guid businessId);
+    Task<MaterialListingDetailsDto?> GetByIdAsync(Guid id);
+    Task<MaterialListingDetailsDto> CreateAsync(CreateMaterialListingRequest request);
+    Task<MaterialListingDetailsDto?> UpdateAsync(Guid id, UpdateMaterialListingRequest request);
+    Task<bool> ChangeStatusAsync(Guid id, int newStatus);
+    Task<Guid?> GetOwnerIdAsync(Guid id);
+    Task<MaterialListingDetailsDto?> AddImagesAsync(Guid id, List<string> imageUrls);
+    Task<int?> ImageCountAsync(Guid id);
+}

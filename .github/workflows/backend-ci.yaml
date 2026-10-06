@@ -6,7 +6,7 @@ on:
       - main
       - 'dev-*'
       - deploy
-      - ci-pipeline
+   
       
   pull_request:
     branches:

@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - 'dev-*'
+      - ci-pipeline
   pull_request:
     branches:
       - main
@@ -15,7 +16,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: frontend
+        working-directory: admin-web
 
     steps:
       - name: Checkout repository

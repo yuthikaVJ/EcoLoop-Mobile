@@ -6,9 +6,9 @@ on:
       - main
       - 'dev-*'
       - deploy
-  pull_request:
-    branches:
-      - main
+  # pull_request:
+  #   branches:
+  #     - main
 
 jobs:
   flutter-ci:

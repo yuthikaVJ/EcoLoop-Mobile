@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   beforeEach,
@@ -143,19 +143,16 @@ describe('VerificationRequestsPage', () => {
 
     render(<VerificationRequestsPage />);
 
-    // Wait for the initial Pending request to finish.
     expect(
       await screen.findByText(
         'No pending requests. All caught up!'
       )
     ).toBeInTheDocument();
 
-    // User clicks the Verified tab.
     await user.click(
       screen.getByRole('button', { name: /Verified/ })
     );
 
-    // Verify that the correct status is passed to the service.
     await vi.waitFor(() => {
       expect(
         verifications.getRequests
@@ -165,7 +162,6 @@ describe('VerificationRequestsPage', () => {
       );
     });
 
-    // Wait for the UI to finish updating.
     expect(
       await screen.findByText('Nothing here.')
     ).toBeInTheDocument();
@@ -185,7 +181,6 @@ describe('VerificationRequestsPage', () => {
 
     render(<VerificationRequestsPage />);
 
-    // Wait for the initial request to finish.
     expect(
       await screen.findByText(
         'No pending requests. All caught up!'
@@ -196,18 +191,15 @@ describe('VerificationRequestsPage', () => {
       'Search name, reg. no. or email'
     );
 
-    // User types a search term.
     await user.type(
       searchBox,
       'Green Lanka'
     );
 
-    // Verify what the user typed.
     expect(
       searchBox
     ).toHaveValue('Green Lanka');
 
-    // Verify that the search term is sent to the service.
     await vi.waitFor(() => {
       expect(
         verifications.getRequests
@@ -216,5 +208,183 @@ describe('VerificationRequestsPage', () => {
         'Green Lanka'
       );
     });
+  });
+
+  // RT-16: Approve business workflow
+  it('approves a pending business when the Approve button is clicked', async () => {
+    const user = userEvent.setup();
+
+    const pendingBusiness = {
+      id: 'req-001',
+      businessName: 'Green Lanka Recycling',
+      businessType: 'Recycling',
+      registrationNumber: 'PV12345',
+      email: 'greenlanka@example.com',
+      phone: '0771234567',
+      address: 'Colombo, Sri Lanka',
+      isVerified: false,
+      status: 'Unverified',
+      createdAt: '2026-10-01T10:00:00Z',
+      logoUrl: null,
+      coverPhotoUrl: null,
+    } as verifications.VerificationRequest;
+
+    const approvedBusiness = {
+      ...pendingBusiness,
+      isVerified: true,
+      status: 'Verified',
+      verifiedAt: '2026-10-07T10:00:00Z',
+    } as verifications.VerificationRequest;
+
+    vi.mocked(verifications.getRequests)
+      .mockResolvedValueOnce([pendingBusiness])
+      .mockResolvedValueOnce([]);
+
+    vi.mocked(verifications.getSummary)
+      .mockResolvedValueOnce({
+        pending: 1,
+        verified: 0,
+        rejected: 0,
+      })
+      .mockResolvedValueOnce({
+        pending: 0,
+        verified: 1,
+        rejected: 0,
+      });
+
+    vi.mocked(verifications.approve).mockResolvedValue(
+      approvedBusiness
+    );
+
+    render(<VerificationRequestsPage />);
+
+    await screen.findAllByText(
+      'Green Lanka Recycling'
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Approve' })
+    );
+
+    await vi.waitFor(() => {
+      expect(
+        verifications.approve
+      ).toHaveBeenCalledWith('req-001');
+    });
+
+    expect(
+      await screen.findByText(
+        'Green Lanka Recycling is now verified.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  // RT-17: Reject business workflow
+  it('rejects a pending business with a rejection reason', async () => {
+    const user = userEvent.setup();
+
+    const pendingBusiness = {
+      id: 'req-001',
+      businessName: 'Green Lanka Recycling',
+      businessType: 'Recycling',
+      registrationNumber: 'PV12345',
+      email: 'greenlanka@example.com',
+      phone: '0771234567',
+      address: 'Colombo, Sri Lanka',
+      isVerified: false,
+      status: 'Unverified',
+      createdAt: '2026-10-01T10:00:00Z',
+      logoUrl: null,
+      coverPhotoUrl: null,
+    } as verifications.VerificationRequest;
+
+    const rejectedBusiness = {
+      ...pendingBusiness,
+      status: 'Rejected',
+      verificationNote:
+        'Registration number does not match.',
+    } as verifications.VerificationRequest;
+
+    vi.mocked(verifications.getRequests)
+      .mockResolvedValueOnce([pendingBusiness])
+      .mockResolvedValueOnce([]);
+
+    vi.mocked(verifications.getSummary)
+      .mockResolvedValueOnce({
+        pending: 1,
+        verified: 0,
+        rejected: 0,
+      })
+      .mockResolvedValueOnce({
+        pending: 0,
+        verified: 0,
+        rejected: 1,
+      });
+
+    vi.mocked(verifications.reject).mockResolvedValue(
+      rejectedBusiness
+    );
+
+    render(<VerificationRequestsPage />);
+
+    // Wait for business to load.
+    await screen.findAllByText(
+      'Green Lanka Recycling'
+    );
+
+    // Click the Reject button in RequestDetails.
+    await user.click(
+      screen.getByRole('button', { name: 'Reject' })
+    );
+
+    // Verify that the rejection dialog opened.
+    const dialog = screen.getByRole('dialog');
+
+    expect(
+      within(dialog).getByText(
+        'Reject Green Lanka Recycling?'
+      )
+    ).toBeInTheDocument();
+
+    // Enter rejection reason.
+    const reasonBox = within(dialog).getByPlaceholderText(
+      'Reason for rejection'
+    );
+
+    await user.type(
+      reasonBox,
+      'Registration number does not match.'
+    );
+
+    expect(reasonBox).toHaveValue(
+      'Registration number does not match.'
+    );
+
+    // IMPORTANT:
+    // There are now two Reject buttons on the page.
+    // Search only inside the rejection dialog.
+    await user.click(
+      within(dialog).getByRole(
+        'button',
+        { name: 'Reject' }
+      )
+    );
+
+    // Verify correct business ID and reason were sent.
+    await vi.waitFor(() => {
+      expect(
+        verifications.reject
+      ).toHaveBeenCalledWith(
+        'req-001',
+        'Registration number does not match.'
+      );
+    });
+
+    // Verify success feedback.
+    expect(
+      await screen.findByText(
+        'Green Lanka Recycling was rejected.'
+      )
+    ).toBeInTheDocument();
   });
 });

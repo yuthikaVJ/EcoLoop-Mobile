@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   beforeEach,
@@ -143,24 +143,48 @@ describe('VerificationRequestsPage', () => {
 
     render(<VerificationRequestsPage />);
 
+    // Wait for initial Unverified request.
     expect(
       await screen.findByText(
         'No pending requests. All caught up!'
       )
     ).toBeInTheDocument();
 
+    expect(
+      verifications.getRequests
+    ).toHaveBeenCalledWith(
+      'Unverified',
+      ''
+    );
+
+    // Click Verified filter.
+    vi.mocked(verifications.getSummary).mockResolvedValue({
+      pending: 0,
+      verified: 3,
+      rejected: 0,
+    });
+
     await user.click(
       screen.getByRole('button', { name: /Verified/ })
     );
 
-    await vi.waitFor(() => {
-      expect(
-        verifications.getRequests
-      ).toHaveBeenCalledWith(
-        'Verified',
-        ''
-      );
-    });
+    // Wait for the debounced request and its updated summary to render.
+    await waitFor(
+      () => {
+        expect(
+          verifications.getRequests
+        ).toHaveBeenCalledWith(
+          'Verified',
+          ''
+        );
+        expect(
+          screen.getByRole('button', { name: /^Verified/ })
+        ).toHaveTextContent('Verified3');
+      },
+      {
+        timeout: 1500,
+      }
+    );
 
     expect(
       await screen.findByText('Nothing here.')
@@ -191,23 +215,41 @@ describe('VerificationRequestsPage', () => {
       'Search name, reg. no. or email'
     );
 
+    vi.mocked(verifications.getRequests).mockResolvedValue([
+      {
+        id: 'req-001',
+        businessName: 'Green Lanka Recycling',
+        registrationNumber: 'PV12345',
+        status: 'Unverified',
+        logoUrl: null,
+        email: 'greenlanka@example.com',
+      } as verifications.VerificationRequest,
+    ]);
+
     await user.type(
       searchBox,
       'Green Lanka'
     );
 
-    expect(
-      searchBox
-    ).toHaveValue('Green Lanka');
+    expect(searchBox).toHaveValue('Green Lanka');
 
-    await vi.waitFor(() => {
-      expect(
-        verifications.getRequests
-      ).toHaveBeenCalledWith(
-        'Unverified',
-        'Green Lanka'
-      );
-    });
+    // Wait for the debounced search request and its results to render.
+    await waitFor(
+      () => {
+        expect(
+          verifications.getRequests
+        ).toHaveBeenCalledWith(
+          'Unverified',
+          'Green Lanka'
+        );
+        expect(
+          screen.getAllByText('Green Lanka Recycling')
+        ).toHaveLength(2);
+      },
+      {
+        timeout: 1500,
+      }
+    );
   });
 
   // RT-16: Approve business workflow
@@ -266,7 +308,7 @@ describe('VerificationRequestsPage', () => {
       screen.getByRole('button', { name: 'Approve' })
     );
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(
         verifications.approve
       ).toHaveBeenCalledWith('req-001');
@@ -327,17 +369,14 @@ describe('VerificationRequestsPage', () => {
 
     render(<VerificationRequestsPage />);
 
-    // Wait for business to load.
     await screen.findAllByText(
       'Green Lanka Recycling'
     );
 
-    // Click the Reject button in RequestDetails.
     await user.click(
       screen.getByRole('button', { name: 'Reject' })
     );
 
-    // Verify that the rejection dialog opened.
     const dialog = screen.getByRole('dialog');
 
     expect(
@@ -346,7 +385,6 @@ describe('VerificationRequestsPage', () => {
       )
     ).toBeInTheDocument();
 
-    // Enter rejection reason.
     const reasonBox = within(dialog).getByPlaceholderText(
       'Reason for rejection'
     );
@@ -360,9 +398,6 @@ describe('VerificationRequestsPage', () => {
       'Registration number does not match.'
     );
 
-    // IMPORTANT:
-    // There are now two Reject buttons on the page.
-    // Search only inside the rejection dialog.
     await user.click(
       within(dialog).getByRole(
         'button',
@@ -370,8 +405,7 @@ describe('VerificationRequestsPage', () => {
       )
     );
 
-    // Verify correct business ID and reason were sent.
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(
         verifications.reject
       ).toHaveBeenCalledWith(
@@ -380,7 +414,6 @@ describe('VerificationRequestsPage', () => {
       );
     });
 
-    // Verify success feedback.
     expect(
       await screen.findByText(
         'Green Lanka Recycling was rejected.'

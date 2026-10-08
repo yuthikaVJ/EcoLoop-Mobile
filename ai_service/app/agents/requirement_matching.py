@@ -35,10 +35,13 @@ class RequirementMatchingAgent:
 
     def run(self, post: Post, profile: MaterialProfile) -> tuple[list[Post], dict, list[LlmCall]]:
         found: dict[str, Post] = {}
+        searched = False
 
         def search(args: dict):
+            nonlocal searched
             categories = validate_categories(args)
             results = self._backend.search_candidates(categories)
+            searched = True
             for candidate in results:
                 found[candidate.id] = candidate
             return {"count": len(results), "posts": [self._summary(c) for c in results]}
@@ -61,8 +64,9 @@ class RequirementMatchingAgent:
             f"The post was listed under category '{post.category}'.",
             [tool],
         )
-        if not search_call.tool_calls:
-            # The model must search; if it didn't, search the post's own category.
+        if not searched:
+            # The model must search; if it didn't (or only tried rejected
+            # arguments), search the post's own category.
             fallback = post.category if post.category in CATEGORIES else "Other"
             search({"categories": [fallback]})
             search_call.tool_calls.append({"tool": "search_candidates", "args": {"categories": [fallback]}, "fallback": True})

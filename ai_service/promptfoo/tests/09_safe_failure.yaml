@@ -1,0 +1,64 @@
+# Safe failure: when the workflow cannot produce a reliable answer it says so,
+# returns no matches and never invents a result.
+- description: 'Safe failure - every AI model unavailable'
+  metadata: { category: safe-failure }
+  vars:
+    scenario: No model in the list exists
+    models: gemini-missing-model-a,gemini-missing-model-b
+    post: { type: I_HAVE, title: PET bottles 500 kg }
+    candidates:
+      - { id: need-1, type: I_NEED, title: PET bottles needed, quantity: '300' }
+  assert:
+    - type: javascript
+      metric: safe-failure
+      value: |
+        const r = JSON.parse(output);
+        const pass = Boolean(r.outcome === 'FAILED' && r.matches.length === 0 && !!r.reason);
+        return { pass, score: pass ? 1 : 0, reason: `${r.outcome}: ${r.reason}` };
+
+- description: 'Safe failure - marketplace search unavailable'
+  metadata: { category: safe-failure }
+  vars:
+    scenario: search_candidates tool fails
+    fail_tool: search
+    post: { type: I_HAVE, title: PET bottles 500 kg }
+    candidates:
+      - { id: need-1, type: I_NEED, title: PET bottles needed, quantity: '300' }
+  assert:
+    - type: javascript
+      metric: safe-failure
+      value: |
+        const r = JSON.parse(output);
+        const pass = Boolean(r.outcome === 'FAILED' && r.matches.length === 0
+                   && r.reason === 'EcoLoop data could not be read for this workflow.');
+        return { pass, score: pass ? 1 : 0, reason: `${r.outcome}: ${r.reason}` };
+
+- description: 'Safe failure - the post itself cannot be loaded'
+  metadata: { category: safe-failure }
+  vars:
+    scenario: get_post fails before any agent runs
+    fail_tool: get_post
+    post: { type: I_HAVE, title: PET bottles 500 kg }
+    candidates: []
+  assert:
+    - type: javascript
+      metric: safe-failure
+      value: |
+        const r = JSON.parse(output);
+        const pass = Boolean(r.outcome === 'FAILED' && r.agentsRun.length === 0 && r.matches.length === 0);
+        return { pass, score: pass ? 1 : 0, reason: `${r.outcome} agents=${r.agentsRun}` };
+
+- description: 'Safe failure - nothing suitable: an explained "no match", not a forced one'
+  metadata: { category: safe-failure }
+  vars:
+    scenario: Only unrelated posts exist
+    post: { type: I_HAVE, title: Old car tyres, category: Other, quantity: '50', unit: Units }
+    candidates:
+      - { id: need-paper, type: I_NEED, title: Need office paper, category: Other, quantity: '100' }
+  assert:
+    - type: javascript
+      metric: safe-failure
+      value: |
+        const r = JSON.parse(output);
+        const pass = Boolean(r.matches.length === 0 && ['NO_MATCH', 'NEEDS_INFO'].includes(r.outcome) && !!r.reason);
+        return { pass, score: pass ? 1 : 0, reason: `${r.outcome}: ${r.reason}` };

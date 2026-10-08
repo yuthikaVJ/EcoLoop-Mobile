@@ -1,0 +1,68 @@
+# Tool selection: agents pick the right allow-listed tool with sensible arguments.
+- description: 'Tool selection - Agent 2 searches the Plastics category for PET bottles'
+  metadata: { category: tool-selection }
+  vars:
+    scenario: PET offer; matching request listed under Plastics
+    post: { type: I_HAVE, title: PET plastic bottles 500 kg }
+    candidates:
+      - { id: need-1, type: I_NEED, title: PET bottles wanted, quantity: '300' }
+  assert:
+    - type: javascript
+      metric: tool-selection
+      value: |
+        const r = JSON.parse(output);
+        const searches = r.toolCalls.filter(t => t.tool === 'search_candidates' && t.agent === 'requirementMatching');
+        const plastics = searches.some(t => (t.args.categories || []).includes('Plastics'));
+        const pass = Boolean(searches.length >= 1 && plastics);
+        return { pass, score: pass ? 1 : 0, reason: `searches=${JSON.stringify(searches.map(s => s.args))}` };
+
+- description: 'Tool selection - Agent 2 searches E-Waste for circuit boards'
+  metadata: { category: tool-selection }
+  vars:
+    scenario: Circuit boards requested
+    post: { type: I_NEED, title: Old circuit boards, category: E-Waste, quantity: '30', unit: Units }
+    candidates:
+      - { id: have-1, type: I_HAVE, title: Printed circuit boards from old PCs, category: E-Waste, quantity: '50', unit: Units }
+  assert:
+    - type: javascript
+      metric: tool-selection
+      value: |
+        const r = JSON.parse(output);
+        const cats = r.searchedCategories.flat();
+        const pass = Boolean(cats.includes('E-Waste'));
+        return { pass, score: pass ? 1 : 0, reason: `searched=${JSON.stringify(r.searchedCategories)}` };
+
+- description: 'Tool selection - Agent 3 asks for the distance of every shortlisted post'
+  metadata: { category: tool-selection }
+  vars:
+    scenario: Two PET buyers in different cities
+    post: { type: I_HAVE, title: PET bottles 1 ton, quantity: '1', unit: Tons }
+    candidates:
+      - { id: need-a, type: I_NEED, title: PET bottles for recycling, quantity: '300', location: Gampaha }
+      - { id: need-b, type: I_NEED, title: Need PET bottle flakes feedstock, quantity: '200', location: Kandy }
+    distances: { need-a: 25.0, need-b: 115.0 }
+  assert:
+    - type: javascript
+      metric: tool-selection
+      value: |
+        const r = JSON.parse(output);
+        const asked = r.toolCalls.filter(t => t.tool === 'get_distance').map(t => t.args.candidateId).sort();
+        const shortlisted = r.findings.filter(f => f.quantityCoverage != null).map(f => f.candidateId).sort();
+        const pass = Boolean(asked.length > 0 && JSON.stringify(asked) === JSON.stringify(shortlisted));
+        return { pass, score: pass ? 1 : 0, reason: `asked=${asked} shortlisted=${shortlisted}` };
+
+- description: 'Tool selection - only allow-listed tools are ever used'
+  metadata: { category: tool-selection }
+  vars:
+    scenario: HDPE drums offered; a recycler needs HDPE
+    post: { type: I_HAVE, title: 'Blue HDPE plastic drums (200 L, rinsed)', category: Plastics, quantity: '200', unit: Units }
+    candidates:
+      - { id: need-1, type: I_NEED, title: HDPE plastic drums for regrinding, category: Plastics, quantity: '100', unit: Units }
+  assert:
+    - type: javascript
+      metric: tool-selection
+      value: |
+        const r = JSON.parse(output);
+        const bad = r.toolCalls.filter(t => !r.allowedTools.includes(t.tool));
+        const pass = Boolean(bad.length === 0 && r.toolCalls.length > 0);
+        return { pass, score: pass ? 1 : 0, reason: `tools=${r.toolCalls.map(t => t.tool)}` };

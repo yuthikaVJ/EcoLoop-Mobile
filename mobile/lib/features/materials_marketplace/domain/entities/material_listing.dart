@@ -1,3 +1,5 @@
+import '../../../../core/config/app_config.dart';
+
 class MaterialListing {
   final String id;
   final String? businessId;
@@ -80,10 +82,13 @@ class MaterialListing {
       isIHave: (json['type'] as int?) == 0,
       status: json['status'] as int? ?? 0,
       datePosted: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : DateTime.now(),
-      imageUrl: json['imageUrl'] as String? ?? 'https://via.placeholder.com/150',
+      // The server stores photos as "/uploads/..." paths (older rows: emulator
+      // links); mediaUrl turns both into a full URL for this app's server.
+      imageUrl: AppConfig.mediaUrl(json['imageUrl'] as String?) ?? 'https://via.placeholder.com/150',
       imageUrls: (json['imageUrls'] as List<dynamic>? ?? const [])
           .whereType<String>()
-          .where((url) => url.isNotEmpty)
+          .map(AppConfig.mediaUrl)
+          .whereType<String>()
           .toList(),
     );
   }

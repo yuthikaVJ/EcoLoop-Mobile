@@ -1,0 +1,35 @@
+# Failure recovery: when part of the system fails, the workflow recovers and still helps.
+- description: 'Failure recovery - a retired model is skipped and the next model finishes the job'
+  metadata: { category: failure-recovery }
+  vars:
+    scenario: First model in the list no longer exists
+    models: gemini-retired-model-for-test,DEFAULT
+    post: { type: I_HAVE, title: PET bottles 500 kg }
+    candidates:
+      - { id: need-1, type: I_NEED, title: PET bottles needed, quantity: '300' }
+  assert:
+    - type: javascript
+      metric: failure-recovery
+      value: |
+        const r = JSON.parse(output);
+        const usedRetired = r.modelsUsed.includes('gemini-retired-model-for-test');
+        const pass = Boolean(r.outcome === 'MATCHES' && !usedRetired && r.modelsUsed.length > 0);
+        return { pass, score: pass ? 1 : 0, reason: `outcome=${r.outcome} models=${r.modelsUsed}` };
+
+- description: 'Failure recovery - routing service down: still recommends, with a distance warning'
+  metadata: { category: failure-recovery }
+  vars:
+    scenario: get_distance tool unavailable
+    fail_tool: distance
+    post: { type: I_HAVE, title: PET bottles 500 kg }
+    candidates:
+      - { id: need-1, type: I_NEED, title: PET bottles needed, quantity: '300' }
+  assert:
+    - type: javascript
+      metric: failure-recovery
+      value: |
+        const r = JSON.parse(output);
+        const m = r.matches.find(m => m.candidateId === 'need-1');
+        const pass = Boolean(!!m && m.distanceKm === null
+                   && m.warnings.includes('Distance between the locations could not be determined.'));
+        return { pass, score: pass ? 1 : 0, reason: m ? JSON.stringify(m) : `${r.outcome}: ${r.reason}` };

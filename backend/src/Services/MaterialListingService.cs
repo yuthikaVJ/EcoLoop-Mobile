@@ -217,8 +217,16 @@ public class MaterialListingService : IMaterialListingService
         if (request.KeepImageUrls != null)
         {
             // Only photos already on this listing can be kept (no arbitrary URLs).
-            var current = CurrentPhotos(listing);
-            var kept = request.KeepImageUrls.Where(current.Contains).Distinct().ToList();
+            // Compare paths: clients send full URLs with their own server address.
+            var current = CurrentPhotos(listing)
+                .GroupBy(MediaPaths.Normalize)
+                .ToDictionary(g => g.Key, g => g.First());
+            var kept = request.KeepImageUrls
+                .Select(MediaPaths.Normalize)
+                .Where(current.ContainsKey)
+                .Distinct()
+                .Select(path => current[path])
+                .ToList();
             listing.ImageUrls = kept;
             listing.ImageUrl = kept.FirstOrDefault();
         }

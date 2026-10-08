@@ -1,0 +1,99 @@
+# Business-rule compliance: EcoLoop's marketplace rules hold whatever the model says.
+- description: 'Business rule - partial quantity is flagged and ranked below a full match'
+  metadata: { category: business-rules }
+  vars:
+    scenario: 300 kg needed, only 200 kg offered
+    post: { type: I_NEED, title: Need 300 kg PET bottles, quantity: '300' }
+    candidates:
+      - { id: have-200, type: I_HAVE, title: PET bottles 200 kg, quantity: '200' }
+  assert:
+    - type: javascript
+      metric: business-rules
+      value: |
+        const r = JSON.parse(output);
+        const m = r.matches.find(m => m.candidateId === 'have-200');
+        // Not recommending a partial offer is also compliant; recommending it
+        // requires the cap and the "Covers N%" warning.
+        const pass = m
+          ? m.quantityCoverage < 1 && m.matchScore <= 0.4 + 0.5 * m.quantityCoverage + 1e-9
+            && m.warnings.some(w => w.startsWith('Covers'))
+          : r.outcome !== 'FAILED';
+        return { pass, score: pass ? 1 : 0, reason: m ? JSON.stringify(m) : `not recommended: ${r.reason}` };
+
+- description: 'Business rule - I HAVE is never matched with I HAVE'
+  metadata: { category: business-rules }
+  vars:
+    scenario: Two sellers of the same material
+    post: { type: I_HAVE, title: PET bottles 500 kg }
+    candidates:
+      - { id: have-other, type: I_HAVE, title: PET bottles 400 kg, quantity: '400' }
+  assert:
+    - type: javascript
+      metric: business-rules
+      value: |
+        const r = JSON.parse(output);
+        const pass = Boolean(r.matches.length === 0);
+        return { pass, score: pass ? 1 : 0, reason: `outcome=${r.outcome}` };
+
+- description: 'Business rule - quantities in incomparable units need more information'
+  metadata: { category: business-rules }
+  vars:
+    scenario: Bales offered against a kilogram request
+    post: { type: I_HAVE, title: PET bottles, quantity: '20', unit: Bales }
+    candidates:
+      - { id: need-kg, type: I_NEED, title: Need PET bottles, quantity: '300', unit: Kgs }
+  assert:
+    - type: javascript
+      metric: business-rules
+      value: |
+        const r = JSON.parse(output);
+        const pass = Boolean(r.outcome === 'NEEDS_INFO' && r.matches.length === 0);
+        return { pass, score: pass ? 1 : 0, reason: `${r.outcome}: ${r.reason}` };
+
+- description: 'Business rule - tons and kilograms are converted by code'
+  metadata: { category: business-rules }
+  vars:
+    scenario: 1 ton offered for a 300 kg need
+    post: { type: I_HAVE, title: PET bottles, quantity: '1', unit: Tons }
+    candidates:
+      - { id: need-kg, type: I_NEED, title: Need PET bottles, quantity: '300', unit: Kgs }
+  assert:
+    - type: javascript
+      metric: business-rules
+      value: |
+        const r = JSON.parse(output);
+        const f = r.findings.find(f => f.candidateId === 'need-kg');
+        const pass = Boolean(!!f && f.quantityCoverage === 1);
+        return { pass, score: pass ? 1 : 0, reason: JSON.stringify(f ?? 'no finding for need-kg') };
+
+- description: 'Business rule - distance never blocks a match, it is reported'
+  metadata: { category: business-rules }
+  vars:
+    scenario: Buyer in Jaffna, about 395 km away
+    post: { type: I_HAVE, title: PET bottles 500 kg, location: Colombo }
+    candidates:
+      - { id: need-far, type: I_NEED, title: PET bottles needed, quantity: '200', location: Jaffna }
+    distances: { need-far: 395.0 }
+  assert:
+    - type: javascript
+      metric: business-rules
+      value: |
+        const r = JSON.parse(output);
+        const m = r.matches.find(m => m.candidateId === 'need-far');
+        const pass = Boolean(!!m && m.distanceKm === 395);
+        return { pass, score: pass ? 1 : 0, reason: m ? JSON.stringify(m) : `${r.outcome}: ${r.reason}` };
+
+- description: 'Business rule - a post without a numeric quantity asks for one'
+  metadata: { category: business-rules }
+  vars:
+    scenario: Quantity written in words
+    post: { type: I_HAVE, title: PET bottles, quantity: lots of them }
+    candidates:
+      - { id: need-1, type: I_NEED, title: Need PET bottles, quantity: '300' }
+  assert:
+    - type: javascript
+      metric: business-rules
+      value: |
+        const r = JSON.parse(output);
+        const pass = Boolean(r.outcome === 'NEEDS_INFO' && /quantity/i.test(r.reason || ''));
+        return { pass, score: pass ? 1 : 0, reason: `${r.outcome}: ${r.reason}` };

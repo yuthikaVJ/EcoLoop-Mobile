@@ -1,0 +1,47 @@
+# Task completion: the workflow finishes its job and returns the right outcome.
+- description: 'Task completion - recommends the matching I NEED post for an I HAVE offer'
+  metadata: { category: task-completion }
+  vars:
+    scenario: 500 kg PET bottles offered; a buyer needs 300 kg
+    post: { type: I_HAVE, title: 500 kg clean PET plastic bottles, description: Baled post-consumer PET bottles. }
+    candidates:
+      - { id: need-pet, type: I_NEED, title: Need PET bottles for recycling, quantity: '300', description: Clean PET bottles only. }
+  assert:
+    - type: javascript
+      metric: task-completion
+      value: |
+        const r = JSON.parse(output);
+        const pass = Boolean(r.outcome === 'MATCHES' && r.matches.some(m => m.candidateId === 'need-pet'));
+        return { pass, score: pass ? 1 : 0, reason: `outcome=${r.outcome} matches=${r.matches.map(m => m.candidateId)}` };
+
+- description: 'Task completion - an I NEED request finds the I HAVE supplier'
+  metadata: { category: task-completion }
+  vars:
+    scenario: A recycler needs 40 graphics cards; another user has 50
+    post: { type: I_NEED, title: Old graphics cards needed, category: E-Waste, quantity: '40', unit: Units, description: For component recovery. }
+    candidates:
+      - { id: have-gpu, type: I_HAVE, title: Old GPUs (GTX 850), category: E-Waste, quantity: '50', unit: Units, description: Used graphics processing units. }
+  assert:
+    - type: javascript
+      metric: task-completion
+      value: |
+        const r = JSON.parse(output);
+        const m = r.matches.find(m => m.candidateId === 'have-gpu');
+        const pass = Boolean(r.outcome === 'MATCHES' && !!m && m.quantityCoverage === 1);
+        return { pass, score: pass ? 1 : 0, reason: `outcome=${r.outcome} coverage=${m && m.quantityCoverage}` };
+
+- description: 'Task completion - recommendations explain themselves'
+  metadata: { category: task-completion }
+  vars:
+    scenario: Aluminium cans offered and requested
+    post: { type: I_HAVE, title: Crushed aluminium cans, category: Metals, quantity: '2', unit: Tons }
+    candidates:
+      - { id: need-alu, type: I_NEED, title: Need aluminium cans, category: Metals, quantity: '1000', unit: Kgs }
+  assert:
+    - type: javascript
+      metric: task-completion
+      value: |
+        const r = JSON.parse(output);
+        const m = r.matches[0];
+        const pass = Boolean(!!m && m.reasons.length > 0 && m.reasons.every(x => x.length > 5));
+        return { pass, score: pass ? 1 : 0, reason: m ? `reasons=${JSON.stringify(m.reasons)}` : `no match: ${r.reason}` };

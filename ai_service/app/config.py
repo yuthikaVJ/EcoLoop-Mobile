@@ -29,6 +29,7 @@ class Settings:
     max_shortlist: int = 5
     max_tool_calls: int = 3
     llm_rounds: int = 2  # passes over the model list before giving up
+    llm_timeout_seconds: int = 60  # per model call
     min_match_score: float = 0.5
 
 

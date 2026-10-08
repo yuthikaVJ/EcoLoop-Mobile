@@ -1,0 +1,53 @@
+# Agent selection: the right agents run for each situation, in order, and the
+# workflow stops early instead of calling agents that have nothing to do.
+- description: 'Agent selection - a normal case runs all four agents in order'
+  metadata: { category: agent-selection }
+  vars:
+    scenario: PET offer with one matching request
+    post: { type: I_HAVE, title: PET bottles 500 kg }
+    candidates:
+      - { id: need-1, type: I_NEED, title: PET bottles needed, quantity: '200' }
+  assert:
+    - type: javascript
+      metric: agent-selection
+      value: |
+        const r = JSON.parse(output);
+        const expected = ['materialUnderstanding', 'requirementMatching', 'logistics', 'matchEvaluation'];
+        const pass = Boolean(JSON.stringify(r.agentsRun) === JSON.stringify(expected));
+        return { pass, score: pass ? 1 : 0, reason: `agents=${r.agentsRun}` };
+    - type: javascript
+      metric: agent-selection
+      value: |
+        const r = JSON.parse(output);
+        const pass = Boolean(JSON.stringify(r.states) === JSON.stringify(['ANALYZING', 'CANDIDATES_FOUND', 'VALIDATING']));
+        return { pass, score: pass ? 1 : 0, reason: `states=${r.states}` };
+
+- description: 'Agent selection - an unclear post stops after Agent 1'
+  metadata: { category: agent-selection }
+  vars:
+    scenario: A post that does not say what the material is
+    post: { type: I_HAVE, title: Stuff for sale, category: Other, description: 'Various things in good condition, good price.' }
+    candidates:
+      - { id: need-1, type: I_NEED, title: Need PET bottles, category: Other }
+  assert:
+    - type: javascript
+      metric: agent-selection
+      value: |
+        const r = JSON.parse(output);
+        const pass = Boolean(JSON.stringify(r.agentsRun) === '["materialUnderstanding"]' && r.outcome === 'NEEDS_INFO');
+        return { pass, score: pass ? 1 : 0, reason: `agents=${r.agentsRun} outcome=${r.outcome}` };
+
+- description: 'Agent selection - no other posts: logistics and evaluation are skipped'
+  metadata: { category: agent-selection }
+  vars:
+    scenario: Nobody else has posted yet
+    post: { type: I_NEED, title: Need copper wire, category: Metals, quantity: '100' }
+    candidates: []
+  assert:
+    - type: javascript
+      metric: agent-selection
+      value: |
+        const r = JSON.parse(output);
+        const ok = JSON.stringify(r.agentsRun) === '["materialUnderstanding","requirementMatching"]';
+        const pass = Boolean(ok && r.outcome === 'NO_MATCH');
+        return { pass, score: pass ? 1 : 0, reason: `agents=${r.agentsRun} outcome=${r.outcome}` };

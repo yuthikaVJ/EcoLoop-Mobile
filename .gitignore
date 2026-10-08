@@ -73,3 +73,7 @@ admin_web/dist/
 **/.venv/
 **/__pycache__/
 **/.pytest_cache/
+
+# promptfoo (ai_service/promptfoo) dependencies
+ai_service/promptfoo/node_modules/
+ai_service/promptfoo/results/

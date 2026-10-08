@@ -109,3 +109,34 @@ class FakeLlm:
             tool.run({"categories": ["Plastics"]})
             call.tool_calls.append({"tool": "search_candidates", "args": {"categories": ["Plastics"]}})
         return "DONE", call
+
+
+class ScriptedLlm:
+    """For single-agent tests: returns the given answer for each output schema and
+    performs the given tool calls, recording every prompt it was sent."""
+
+    def __init__(self, answers: dict | None = None, tool_calls: list[tuple[str, dict]] | None = None):
+        self.answers = answers or {}
+        self.tool_calls = tool_calls or []
+        self.structured_calls: list[tuple[str, str, type]] = []
+        self.tool_results: list = []
+        self.tools_offered: list[list[str]] = []
+
+    def structured(self, system, prompt, schema):
+        self.structured_calls.append((system, prompt, schema))
+        answer = self.answers[schema]
+        return (answer(prompt) if callable(answer) else answer), LlmCall(model="scripted", seconds=0.0)
+
+    def with_tools(self, system, prompt, tools):
+        self.tools_offered.append([t.name for t in tools])
+        call = LlmCall(model="scripted", seconds=0.0)
+        by_name = {t.name: t for t in tools}
+        for name, args in self.tool_calls:
+            tool = by_name.get(name)
+            try:
+                result = tool.run(args) if tool else {"error": f"Tool '{name}' is not allowed."}
+            except ValueError as error:
+                result = {"error": str(error)}
+            self.tool_results.append(result)
+            call.tool_calls.append({"tool": name, "args": args})
+        return "DONE", call

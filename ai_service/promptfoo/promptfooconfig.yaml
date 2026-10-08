@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+# promptfoo evaluation of the EcoLoop agentic material-matching workflow.
+# Every test runs the real workflow (4 agents + tools + validators) with the
+# real Gemini model; see provider.py. One file per test category in tests/.
+description: EcoLoop agentic AI material matching
+
+prompts:
+  # The workflow builds its own agent prompts; this line only labels each case.
+  - 'EcoLoop matching scenario: {{scenario}}'
+
+providers:
+  - id: file://provider.py
+    label: ecoloop-agentic-workflow
+    config:
+      pythonExecutable: ../.venv/Scripts/python.exe
+      # A full 4-agent run can take minutes when Gemini is busy (model fallback).
+      timeout: 900000
+
+tests:
+  - file://tests/01_task_completion.yaml
+  - file://tests/02_agent_selection.yaml
+  - file://tests/03_tool_selection.yaml
+  - file://tests/04_structured_output.yaml
+  - file://tests/05_business_rules.yaml
+  - file://tests/06_prompt_injection.yaml
+  - file://tests/07_approval_enforcement.yaml
+  - file://tests/08_failure_recovery.yaml
+  - file://tests/09_safe_failure.yaml
+
+# One workflow at a time: keeps within the Gemini free-tier rate limit.
+evaluateOptions:
+  maxConcurrency: 1
+  delay: 10000  # ms between scenarios

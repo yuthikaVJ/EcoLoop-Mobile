@@ -193,7 +193,8 @@ public class MaterialListingsController : ControllerBase
             {
                 await file.CopyToAsync(stream);
             }
-            urls.Add($"http://10.0.2.2:5252/uploads/material_listings/{fileName}");
+            // Relative path: each client adds its own server address (see MediaPaths).
+            urls.Add($"/uploads/material_listings/{fileName}");
         }
         return (urls, null);
     }

@@ -72,7 +72,7 @@ class MaterialListingRepository {
         request.files.add(await http.MultipartFile.fromPath('images', file.path));
       }
       request.headers.addAll(await _apiClient.getAuthHeaders());
-      return http.Response.fromStream(await request.send());
+      return _apiClient.send(request);
     }
 
     try {
@@ -116,7 +116,7 @@ class MaterialListingRepository {
         request.files.add(await http.MultipartFile.fromPath('images', file.path));
       }
       request.headers.addAll(await _apiClient.getAuthHeaders());
-      return http.Response.fromStream(await request.send());
+      return _apiClient.send(request);
     }
 
     var response = await send();

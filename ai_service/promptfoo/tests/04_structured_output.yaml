@@ -1,0 +1,62 @@
+# Structured output: the result and every agent output follow the agreed schema.
+- description: 'Structured output - the workflow result matches the JSON schema'
+  metadata: { category: structured-output }
+  vars:
+    scenario: PET offer and request (full run)
+    post: { type: I_HAVE, title: PET bottles 500 kg }
+    candidates:
+      - { id: need-1, type: I_NEED, title: PET bottles needed, quantity: '300' }
+  assert:
+    - type: is-json
+      metric: structured-output
+      value:
+        type: object
+        required: [outcome, reason, matches, agentsRun, toolCalls, materialUnderstanding]
+        properties:
+          outcome: { enum: [MATCHES, NO_MATCH, NEEDS_INFO, FAILED] }
+          matches:
+            type: array
+            items:
+              type: object
+              required: [candidateId, matchScore, reasons, warnings, quantityCoverage, distanceKm, requiredAction]
+              properties:
+                candidateId: { type: string }
+                matchScore: { type: number, minimum: 0, maximum: 1 }
+                reasons: { type: array, minItems: 1, maxItems: 5, items: { type: string, maxLength: 160 } }
+                warnings: { type: array, maxItems: 5, items: { type: string, maxLength: 160 } }
+                quantityCoverage: { type: number, minimum: 0, maximum: 1 }
+                requiredAction: { const: USER_APPROVAL }
+
+- description: 'Structured output - Agent 1 returns a complete material profile'
+  metadata: { category: structured-output }
+  vars:
+    scenario: Corrugated cardboard offer
+    post: { type: I_HAVE, title: Corrugated cardboard boxes, category: Paper, quantity: '2', unit: Tons }
+    candidates: []
+  assert:
+    - type: javascript
+      metric: structured-output
+      value: |
+        const p = JSON.parse(output).materialUnderstanding || {};
+        const ok = typeof p.material === 'string' && p.material.length > 0
+          && typeof p.materialFamily === 'string' && typeof p.isAmbiguous === 'boolean'
+          && p.postType === 'I_HAVE' && p.quantity === 2 && p.unit === 't';
+        const pass = Boolean(ok);
+        return { pass, score: pass ? 1 : 0, reason: JSON.stringify(p) };
+
+- description: 'Structured output - Agent 2 grades every candidate with an allowed label'
+  metadata: { category: structured-output }
+  vars:
+    scenario: Glass offer against glass and paper requests
+    post: { type: I_HAVE, title: Clear glass bottles, category: Glass, quantity: '300' }
+    candidates:
+      - { id: need-glass, type: I_NEED, title: Need clear glass cullet, category: Glass, quantity: '200' }
+      - { id: need-other, type: I_NEED, title: Need office paper, category: Glass, quantity: '200' }
+  assert:
+    - type: javascript
+      metric: structured-output
+      value: |
+        const f = JSON.parse(output).findings;
+        const labels = ['EXACT', 'RELATED', 'INCOMPATIBLE', 'UNCLEAR'];
+        const pass = Boolean(f.length === 2 && f.every(x => labels.includes(x.materialCompatibility)));
+        return { pass, score: pass ? 1 : 0, reason: JSON.stringify(f) };

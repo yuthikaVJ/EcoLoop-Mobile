@@ -9,6 +9,9 @@ using FirebaseAdmin;
 using Google.Apis.Auth.OAuth2;
 
 DotNetEnv.Env.Load();
+// ASP.NET only serves wwwroot if it exists at startup, so create the uploads
+// folder first (a fresh server has none until the first photo is uploaded).
+Directory.CreateDirectory(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads"));
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers(options => options.Filters.Add<EcoLoop.Api.Controllers.TransactionExceptionFilter>());

@@ -4,11 +4,11 @@ import 'dart:convert';
 class AppConfig {
   /// The ONE place to change the backend address. Override at build time with
   /// --dart-define=ECOLOOP_SERVER_URL=https://your-host (no trailing slash).
-  /// Default is the hosted backend; for a local backend on the Android emulator
-  /// use http://10.0.2.2:5252.
+  /// Default is a backend running on this PC, reached from the Android emulator
+  /// (10.0.2.2 = the PC's localhost); the hosted backend is http://52.74.2.76:5252.
   static const serverUrl = String.fromEnvironment(
     'ECOLOOP_SERVER_URL',
-    defaultValue: 'http://52.74.2.76:5252',
+    defaultValue: 'http://10.0.2.2:5252',
   );
 
   static const apiBaseUrl = '$serverUrl/api';

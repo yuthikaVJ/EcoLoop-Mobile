@@ -57,4 +57,34 @@ public class MaterialListingImagesTests
         });
         Assert.Equal(3, textOnly!.ImageUrls.Count);
     }
+
+    [Theory]
+    [InlineData("/uploads/material_listings/a.jpg", "/uploads/material_listings/a.jpg")]
+    [InlineData("http://10.0.2.2:5252/uploads/material_listings/a.jpg", "/uploads/material_listings/a.jpg")]
+    [InlineData("http://52.74.2.76:5252/uploads/material_listings/a.jpg", "/uploads/material_listings/a.jpg")]
+    [InlineData("https://lh3.googleusercontent.com/photo.jpg", "https://lh3.googleusercontent.com/photo.jpg")]
+    public void MediaPaths_KeepOnlyThePathOfOurUploads(string url, string expected) =>
+        Assert.Equal(expected, MediaPaths.Normalize(url));
+
+    [Fact]
+    public async Task EditingFromAPhone_KeepsPhotosSentAsFullUrls()
+    {
+        await using var context = await Component4TestContext.CreateAsync();
+        var service = new MaterialListingService(context.Db);
+        var created = await service.CreateAsync(new CreateMaterialListingRequest
+        {
+            BusinessId = context.Seller.Id, Title = "Copper", Category = "METALS", Quantity = "5", Unit = "Kgs",
+            Location = "Colombo", ImageUrl = "/uploads/material_listings/a.jpg",
+            ImageUrls = ["/uploads/material_listings/a.jpg", "/uploads/material_listings/b.jpg"],
+        });
+
+        // The app shows (and sends back) full URLs with its own server address.
+        var updated = await service.UpdateAsync(created.Id, new UpdateMaterialListingRequest
+        {
+            Title = "Copper", Category = "METALS", Quantity = "5", Unit = "Kgs", Location = "Colombo",
+            KeepImageUrls = ["http://52.74.2.76:5252/uploads/material_listings/b.jpg"],
+        });
+
+        Assert.Equal(["/uploads/material_listings/b.jpg"], updated!.ImageUrls);
+    }
 }

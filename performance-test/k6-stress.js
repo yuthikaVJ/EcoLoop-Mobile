@@ -16,7 +16,7 @@ export const options = {
   },
 };
 
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:5252';
+const BASE_URL = __ENV.BASE_URL || 'http://70.153.136.178:5252';
 
 export default function () {
   const response = http.get(`${BASE_URL}/api/products`);
